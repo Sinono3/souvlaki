@@ -3,6 +3,8 @@ name = "midyakis"
 version = "0.0.1"
 authors = ["Sinono3 <aldoacevedo@protonmail.com>"]
 edition = "2018"
+description = "A cross-platform media key and metadata handling library."
+license = "MIT"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 raw-window-handle = "0.3.3"
