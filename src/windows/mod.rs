@@ -1,13 +1,15 @@
+mod bindings;
+use self::bindings::windows as win;
+
 use std::collections::VecDeque;
 use std::sync::{Arc, RwLock};
 use raw_window_handle::windows::WindowsHandle;
 
-use windows_bindings::windows;
-use windows::foundation::TypedEventHandler;
-use windows::win32::media_transport::ISystemMediaTransportControlsInterop;
-use windows::win32::windows_and_messaging::HWND;
-use windows::media::*;
-use windows::{Abi, Interface};
+use win::foundation::TypedEventHandler;
+use win::win32::media_transport::ISystemMediaTransportControlsInterop;
+use win::win32::windows_and_messaging::HWND;
+use win::media::*;
+use win::{Abi, Interface};
 
 use crate::{MediaControlEvent, MediaControls, MediaPlayer};
 
@@ -26,12 +28,12 @@ enum WindowsMediaPlaybackStatus {
 }
 
 impl<S: MediaPlayer> MediaControls<S> for WindowsMediaControls {
-    type Error = windows::Error;
+    type Error = win::Error;
     type Args = WindowsHandle;
 
-    fn new(_: &S, args: Self::Args) -> windows::Result<Self> {
+    fn new(_: &S, args: Self::Args) -> win::Result<Self> {
         let interop: ISystemMediaTransportControlsInterop =
-            windows::factory::<SystemMediaTransportControls, ISystemMediaTransportControlsInterop>(
+            win::factory::<SystemMediaTransportControls, ISystemMediaTransportControlsInterop>(
             )?;
 
         let mut smtc: Option<SystemMediaTransportControls> = None;

@@ -5,8 +5,11 @@ authors = ["Sinono3 <aldoacevedo@protonmail.com>"]
 edition = "2018"
 
 [target.'cfg(target_os = "windows")'.dependencies]
-windows_bindings = { path = "windows_bindings" }
 raw-window-handle = "0.3.3"
+windows = { git = "https://github.com/microsoft/windows-rs" }
+
+[target.'cfg(target_os = "windows")'.build-dependencies]
+windows = { git = "https://github.com/microsoft/windows-rs" }
 
 [target.'cfg(target_os = "windows")'.dev-dependencies]
 winit = "0.24.0"

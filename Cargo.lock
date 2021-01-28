@@ -491,7 +491,7 @@ name = "midyakis"
 version = "0.0.1"
 dependencies = [
  "raw-window-handle",
- "windows_bindings",
+ "windows",
  "winit",
 ]
 
@@ -1087,13 +1087,6 @@ dependencies = [
  "windows_gen",
  "windows_macros",
  "windows_winmd",
-]
-
-[[package]]
-name = "windows_bindings"
-version = "0.1.0"
-dependencies = [
- "windows",
 ]
 
 [[package]]
