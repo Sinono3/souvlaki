@@ -1,4 +1,4 @@
-use midyakis::MediaControls;
+use souvlaki::MediaControls;
 use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
 use winit::{
     event::{Event, WindowEvent},
@@ -9,7 +9,7 @@ struct TestApp {
     playing: bool,
 }
 
-impl midyakis::MediaPlayer for TestApp {
+impl souvlaki::MediaPlayer for TestApp {
     fn play(&mut self) {
         self.playing = true;
     }
@@ -19,8 +19,8 @@ impl midyakis::MediaPlayer for TestApp {
     fn playing(&self) -> bool {
         self.playing
     }
-    fn metadata(&self) -> midyakis::MediaMetadata {
-        midyakis::MediaMetadata {
+    fn metadata(&self) -> souvlaki::MediaMetadata {
+        souvlaki::MediaMetadata {
             title: "When The Sun Hits".to_string(),
             album: "Souvlaki".to_string(),
             artist: "Slowdive".to_string(),
@@ -38,7 +38,7 @@ fn main() {
     };
 
     let mut test_app = TestApp { playing: false };
-    let mut controls = midyakis::windows::WindowsMediaControls::new(&test_app, handle).unwrap();
+    let mut controls = souvlaki::windows::WindowsMediaControls::new(&test_app, handle).unwrap();
 
     event_loop.run(move |event, _, control_flow| {
         // In this example, poll is needed.

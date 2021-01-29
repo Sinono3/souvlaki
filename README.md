@@ -1,4 +1,4 @@
-# Midyakis
+# Souvlaki
 
 A (not yet) cross-platform solution to OS media controls.
 

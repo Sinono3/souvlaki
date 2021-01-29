@@ -487,15 +487,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "midyakis"
-version = "0.0.1"
-dependencies = [
- "raw-window-handle",
- "windows",
- "winit",
-]
-
-[[package]]
 name = "mio"
 version = "0.6.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -879,6 +870,15 @@ dependencies = [
  "wayland-client",
  "wayland-cursor",
  "wayland-protocols",
+]
+
+[[package]]
+name = "souvlaki"
+version = "0.0.1"
+dependencies = [
+ "raw-window-handle",
+ "windows",
+ "winit",
 ]
 
 [[package]]
