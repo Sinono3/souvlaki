@@ -42,8 +42,8 @@ impl MediaControls for WindowsMediaControls {
                 HWND(args.hwnd as isize),
                 &SystemMediaTransportControls::IID as *const _,
                 smtc.set_abi(),
-            );
-        }
+            )
+        }.unwrap();
 
         let controls = smtc.unwrap();
         controls.set_is_enabled(true)?;
