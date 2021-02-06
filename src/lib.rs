@@ -1,29 +1,25 @@
 #[cfg(target_os = "windows")]
 pub mod windows;
 
-pub trait MediaPlayer {
-    fn play(&mut self);
-    fn pause(&mut self);
-    fn playing(&self) -> bool;
-
-    fn metadata(&self) -> MediaMetadata;
-}
-
-pub trait MediaControls<S: MediaPlayer> {
+pub trait MediaControls: Sized {
     type Args;
     type Error;
 
-    fn new(state: &S, args: Self::Args) -> Result<Self, Self::Error>
+    fn create(args: Self::Args) -> Result<Self, Self::Error>;
+
+    fn set_playback(&mut self, playing: bool);
+    fn set_metadata(&mut self, metadata: MediaMetadata);
+    
+    fn poll<'f, F>(&mut self, handler: F)
     where
-        Self: Sized;
-    fn poll(&mut self, state: &mut S);
+        F: 'f + FnMut(MediaControlEvent);
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct MediaMetadata {
-    pub title: String,
-    pub album: String,
-    pub artist: String,
+pub struct MediaMetadata<'s> {
+    pub title: &'s str,
+    pub album: &'s str,
+    pub artist: &'s str,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

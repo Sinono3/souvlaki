@@ -1,4 +1,5 @@
-use souvlaki::MediaControls;
+#![cfg(target_os = "windows")]
+use souvlaki::{MediaControls, MediaControlEvent};
 use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
 use winit::{
     event::{Event, WindowEvent},
@@ -7,25 +8,6 @@ use winit::{
 };
 struct TestApp {
     playing: bool,
-}
-
-impl souvlaki::MediaPlayer for TestApp {
-    fn play(&mut self) {
-        self.playing = true;
-    }
-    fn pause(&mut self) {
-        self.playing = false;
-    }
-    fn playing(&self) -> bool {
-        self.playing
-    }
-    fn metadata(&self) -> souvlaki::MediaMetadata {
-        souvlaki::MediaMetadata {
-            title: "When The Sun Hits".to_string(),
-            album: "Souvlaki".to_string(),
-            artist: "Slowdive".to_string(),
-        }
-    }
 }
 
 fn main() {
@@ -37,12 +19,18 @@ fn main() {
         _ => panic!("Not Windows"),
     };
 
-    let mut test_app = TestApp { playing: false };
-    let mut controls = souvlaki::windows::WindowsMediaControls::new(&test_app, handle).unwrap();
+    let mut app = TestApp { playing: false };
+    let mut controls = souvlaki::windows::WindowsMediaControls::create(handle).unwrap();
+
+    controls.set_metadata(
+        souvlaki::MediaMetadata {
+            title: "When The Sun Hits",
+            album: "Souvlaki",
+            artist: "Slowdive",
+        }
+    );
 
     event_loop.run(move |event, _, control_flow| {
-        // In this example, poll is needed.
-        // N
         *control_flow = ControlFlow::Poll;
 
         match event {
@@ -53,7 +41,25 @@ fn main() {
                 *control_flow = ControlFlow::Exit
             }
             Event::MainEventsCleared => {
-                controls.poll(&mut test_app);
+                let mut change = false;
+
+                controls.poll(|event| {
+                    match event {
+                        MediaControlEvent::Play => app.playing = true,
+                        MediaControlEvent::Pause => app.playing = false,
+                        _ => unimplemented!(),
+                    }
+                    change = true;
+                });
+
+                if change {
+                    controls.set_playback(app.playing);
+                    eprintln!("App is now: {}", if app.playing {
+                        "playing"
+                    } else {
+                        "paused"
+                    });
+                }
             }
             _ => (),
         }

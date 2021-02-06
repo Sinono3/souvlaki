@@ -11,7 +11,7 @@ use win::win32::windows_and_messaging::HWND;
 use win::media::*;
 use win::{Abi, Interface};
 
-use crate::{MediaControlEvent, MediaControls, MediaPlayer};
+use crate::{MediaControlEvent, MediaControls, MediaMetadata};
 
 pub struct WindowsMediaControls {
     controls: SystemMediaTransportControls,
@@ -27,11 +27,11 @@ enum WindowsMediaPlaybackStatus {
     // TODO: implement the rest, if necessary.
 }
 
-impl<S: MediaPlayer> MediaControls<S> for WindowsMediaControls {
+impl MediaControls for WindowsMediaControls {
     type Error = win::Error;
     type Args = WindowsHandle;
 
-    fn new(_: &S, args: Self::Args) -> win::Result<Self> {
+    fn create(args: Self::Args) -> win::Result<Self> {
         let interop: ISystemMediaTransportControlsInterop =
             win::factory::<SystemMediaTransportControls, ISystemMediaTransportControlsInterop>(
             )?;
@@ -86,28 +86,18 @@ impl<S: MediaPlayer> MediaControls<S> for WindowsMediaControls {
             events,
         })
     }
-    fn poll(&mut self, state: &mut S) {
+    fn poll<'f, F>(&mut self, mut handler: F) 
+    where
+        F: 'f + FnMut(MediaControlEvent)
+    {
         if let Ok(mut events) = self.events.try_write() {
             while let Some(event) = events.pop_front() {
-                match dbg!(event) {
-                    MediaControlEvent::Play => state.play(),
-                    MediaControlEvent::Pause => state.pause(),
-                    _ => unimplemented!(),
-                }
+                handler(event);
             }
         }
-        // TODO: optimize all of this so it only runs when necessary.
-        // Update metadata
-        let metadata = state.metadata();
-        let properties = self.display_updater.music_properties().unwrap();
-
-        properties.set_title(metadata.title).unwrap();
-        properties.set_artist(metadata.artist).unwrap();
-        properties.set_album_title(metadata.album).unwrap();
-        self.display_updater.update().unwrap();
-
-        // Updates playback status.
-        let status = if state.playing() {
+    }
+    fn set_playback(&mut self, playing: bool) {
+        let status = if playing {
             WindowsMediaPlaybackStatus::Playing as i32
         } else {
             WindowsMediaPlaybackStatus::Paused as i32
@@ -115,5 +105,14 @@ impl<S: MediaPlayer> MediaControls<S> for WindowsMediaControls {
         self.controls
             .set_playback_status(MediaPlaybackStatus(status))
             .unwrap();
+    }
+    fn set_metadata(&mut self, metadata: MediaMetadata) {
+        let properties = self.display_updater.music_properties().unwrap();
+
+        properties.set_title(metadata.title).unwrap();
+        properties.set_artist(metadata.artist).unwrap();
+        properties.set_album_title(metadata.album).unwrap();
+
+        self.display_updater.update().unwrap();
     }
 }
