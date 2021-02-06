@@ -1,6 +1,6 @@
 [package]
 name = "souvlaki"
-version = "0.0.1"
+version = "0.0.2"
 authors = ["Sinono3 <aldoacevedo@protonmail.com>"]
 edition = "2018"
 description = "A cross-platform media key and metadata handling library."
