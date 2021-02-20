@@ -1,3 +1,5 @@
+#![cfg(target_os = "windows")]
+
 mod bindings;
 use self::bindings::windows as win;
 
@@ -11,9 +13,9 @@ use win::win32::windows_and_messaging::HWND;
 use win::media::*;
 use win::{Abi, Interface};
 
-use crate::{MediaControlEvent, MediaControls, MediaMetadata};
+use crate::{MediaControlEvent, MediaMetadata};
 
-pub struct WindowsMediaControls {
+pub struct MediaControls {
     controls: SystemMediaTransportControls,
     display_updater: SystemMediaTransportControlsDisplayUpdater,
     events: Arc<RwLock<VecDeque<MediaControlEvent>>>,
@@ -27,11 +29,17 @@ enum WindowsMediaPlaybackStatus {
     // TODO: implement the rest, if necessary.
 }
 
-impl MediaControls for WindowsMediaControls {
-    type Error = win::Error;
-    type Args = WindowsHandle;
+#[derive(Debug)]
+pub struct OsError(win::Error);
 
-    fn create(args: Self::Args) -> win::Result<Self> {
+impl From<win::Error> for OsError {
+    fn from(other: win::Error) -> OsError {
+        OsError(other)
+    }
+}
+
+impl MediaControls {
+    pub fn create(window_handle: WindowsHandle) -> win::Result<Self> {
         let interop: ISystemMediaTransportControlsInterop =
             win::factory::<SystemMediaTransportControls, ISystemMediaTransportControlsInterop>(
             )?;
@@ -39,7 +47,7 @@ impl MediaControls for WindowsMediaControls {
         let mut smtc: Option<SystemMediaTransportControls> = None;
         unsafe {
             interop.GetForWindow(
-                HWND(args.hwnd as isize),
+                HWND(window_handle.hwnd as isize),
                 &SystemMediaTransportControls::IID as *const _,
                 smtc.set_abi(),
             )
@@ -86,7 +94,7 @@ impl MediaControls for WindowsMediaControls {
             events,
         })
     }
-    fn poll<'f, F>(&mut self, mut handler: F) 
+    pub fn poll<'f, F>(&mut self, mut handler: F) 
     where
         F: 'f + FnMut(MediaControlEvent)
     {
@@ -96,7 +104,7 @@ impl MediaControls for WindowsMediaControls {
             }
         }
     }
-    fn set_playback(&mut self, playing: bool) {
+    pub fn set_playback(&mut self, playing: bool) {
         let status = if playing {
             WindowsMediaPlaybackStatus::Playing as i32
         } else {
@@ -106,7 +114,7 @@ impl MediaControls for WindowsMediaControls {
             .set_playback_status(MediaPlaybackStatus(status))
             .unwrap();
     }
-    fn set_metadata(&mut self, metadata: MediaMetadata) {
+    pub fn set_metadata(&mut self, metadata: MediaMetadata) {
         let properties = self.display_updater.music_properties().unwrap();
 
         properties.set_title(metadata.title).unwrap();

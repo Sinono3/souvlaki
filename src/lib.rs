@@ -1,18 +1,23 @@
-#[cfg(target_os = "windows")]
-pub mod windows;
+pub mod platform;
+mod platform_impl;
 
-pub trait MediaControls: Sized {
-    type Args;
-    type Error;
+pub struct MediaControls {
+    controls: platform_impl::MediaControls
+}
 
-    fn create(args: Self::Args) -> Result<Self, Self::Error>;
-
-    fn set_playback(&mut self, playing: bool);
-    fn set_metadata(&mut self, metadata: MediaMetadata);
-    
-    fn poll<'f, F>(&mut self, handler: F)
+impl MediaControls {
+    pub fn set_playback(&mut self, playing: bool) {
+        self.controls.set_playback(playing);
+    }
+    pub fn set_metadata(&mut self, metadata: MediaMetadata) {
+        self.controls.set_metadata(metadata);
+    }
+    pub fn poll<'f, F>(&mut self, handler: F)
     where
-        F: 'f + FnMut(MediaControlEvent);
+        F: 'f + FnMut(MediaControlEvent) 
+    {
+        self.controls.poll(handler);
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]

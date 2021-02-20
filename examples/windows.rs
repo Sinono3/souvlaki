@@ -1,5 +1,6 @@
 #![cfg(target_os = "windows")]
 use souvlaki::{MediaControls, MediaControlEvent};
+use souvlaki::platform::windows::MediaControlsExtWindows;
 use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
 use winit::{
     event::{Event, WindowEvent},
@@ -20,7 +21,7 @@ fn main() {
     };
 
     let mut app = TestApp { playing: false };
-    let mut controls = souvlaki::windows::WindowsMediaControls::create(handle).unwrap();
+    let mut controls = MediaControls::create_for_window(handle).unwrap();
 
     controls.set_metadata(
         souvlaki::MediaMetadata {

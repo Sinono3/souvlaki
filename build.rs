@@ -1,4 +1,4 @@
-fn main() {
+fn build_winapi() {
     windows::build!(
         windows::media::{
             SystemMediaTransportControls,
@@ -7,4 +7,9 @@ fn main() {
         windows::win32::windows_and_messaging::HWND,
         windows::win32::media_transport::ISystemMediaTransportControlsInterop,
     );
+}
+
+fn main() {
+    #[cfg(target_os = "windows")]
+    build_winapi();
 }
