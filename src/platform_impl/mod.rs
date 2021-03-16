@@ -4,7 +4,9 @@ pub use self::platform::*;
 #[path = "windows/mod.rs"]
 mod platform;
 
-#[cfg(all(
-    not(target_os = "windows")
-))]
+#[cfg(target_os = "macos")]
+#[path = "macos/mod.rs"]
+mod platform;
+
+#[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
 compile_error!("The platform you're compiling for is not supported by souvlaki");

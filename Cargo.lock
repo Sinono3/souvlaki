@@ -716,6 +716,9 @@ dependencies = [
 name = "souvlaki"
 version = "0.1.0"
 dependencies = [
+ "block",
+ "cocoa",
+ "objc",
  "raw-window-handle",
  "windows",
  "winit",
