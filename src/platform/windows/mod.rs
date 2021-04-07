@@ -26,16 +26,16 @@ enum WindowsMediaPlaybackStatus {
 }
 
 #[derive(Debug)]
-pub struct OsError(win::Error);
+pub struct Error(win::Error);
 
-impl From<win::Error> for OsError {
-    fn from(other: win::Error) -> OsError {
-        OsError(other)
+impl From<win::Error> for Error {
+    fn from(other: win::Error) -> Error {
+        Error(other)
     }
 }
 
 impl MediaControls {
-    pub fn create_for_window(window_handle: WindowsHandle) -> Result<Self, OsError> {
+    pub fn for_window(window_handle: WindowsHandle) -> Result<Self, Error> {
         let interop: ISystemMediaTransportControlsInterop =
             win::factory::<SystemMediaTransportControls, ISystemMediaTransportControlsInterop>()?;
 
@@ -57,7 +57,7 @@ impl MediaControls {
         })
     }
 
-    pub fn attach<F>(&mut self, event_handler: F) -> Result<(), OsError>
+    pub fn attach<F>(&mut self, event_handler: F) -> Result<(), Error>
     where
         F: Fn(MediaControlEvent) + Send + 'static,
     {
@@ -95,13 +95,13 @@ impl MediaControls {
         Ok(())
     }
 
-    pub fn detach(&mut self) -> Result<(), OsError> {
+    pub fn detach(&mut self) -> Result<(), Error> {
         self.controls.set_is_enabled(false)?;
         self.controls.button_pressed(None)?;
         Ok(())
     }
 
-    pub fn set_playback(&mut self, playback: MediaPlayback) {
+    pub fn set_playback(&mut self, playback: MediaPlayback) -> Result<(), Error> {
         let status = match playback {
             MediaPlayback::Playing => WindowsMediaPlaybackStatus::Playing as i32,
             MediaPlayback::Paused => WindowsMediaPlaybackStatus::Paused as i32,
@@ -110,9 +110,10 @@ impl MediaControls {
         self.controls
             .set_playback_status(MediaPlaybackStatus(status))
             .unwrap();
+        Ok(())
     }
 
-    pub fn set_metadata(&mut self, metadata: MediaMetadata) {
+    pub fn set_metadata(&mut self, metadata: MediaMetadata) -> Result<(), Error> {
         let properties = self.display_updater.music_properties().unwrap();
 
         properties.set_title(metadata.title).unwrap();
@@ -120,5 +121,6 @@ impl MediaControls {
         properties.set_album_title(metadata.album).unwrap();
 
         self.display_updater.update().unwrap();
+        Ok(())
     }
 }

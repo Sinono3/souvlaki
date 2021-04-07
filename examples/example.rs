@@ -3,11 +3,6 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-#[cfg(target_os = "macos")]
-use souvlaki::platform::macos::MediaControlsExtMacOs;
-#[cfg(target_os = "windows")]
-use souvlaki::platform::windows::MediaControlsExtWindows;
-
 use souvlaki::{MediaControlEvent, MediaControls};
 use souvlaki::{MediaMetadata, MediaPlayback};
 use winit::{
@@ -28,28 +23,34 @@ fn main() {
     let mut controls = {
         let handle = match window.raw_window_handle() {
             RawWindowHandle::Windows(h) => h,
-            _ => panic!("Not Windows"),
+            _ => unreachable!(),
         };
         MediaControls::create_for_window(handle).unwrap();
     };
     #[cfg(target_os = "macos")]
-    let mut controls = MediaControls::create().unwrap();
+    let mut controls = MediaControls::new();
+    #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+    let mut controls = MediaControls::new();
 
     let pending_events = Arc::new(Mutex::new(VecDeque::new()));
     let mut app = TestApp { playing: true };
 
-    controls.attach({
-        let pending_events = pending_events.clone();
-        move |event| {
-            pending_events.lock().unwrap().push_back(event);
-        }
-    });
-    controls.set_playback(MediaPlayback::Playing);
-    controls.set_metadata(MediaMetadata {
-        title: Some("When The Sun Hits"),
-        album: Some("Souvlaki"),
-        artist: Some("Slowdive"),
-    });
+    controls
+        .attach({
+            let pending_events = pending_events.clone();
+            move |event| {
+                pending_events.lock().unwrap().push_back(event);
+            }
+        })
+        .unwrap();
+    controls.set_playback(MediaPlayback::Playing).unwrap();
+    controls
+        .set_metadata(MediaMetadata {
+            title: Some("When The Sun Hits"),
+            album: Some("Souvlaki"),
+            artist: Some("Slowdive"),
+        })
+        .unwrap();
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
@@ -75,11 +76,13 @@ fn main() {
                 }
 
                 if change {
-                    controls.set_playback(if app.playing {
-                        MediaPlayback::Playing
-                    } else {
-                        MediaPlayback::Paused
-                    });
+                    controls
+                        .set_playback(if app.playing {
+                            MediaPlayback::Playing
+                        } else {
+                            MediaPlayback::Paused
+                        })
+                        .unwrap();
                     eprintln!(
                         "App is now: {}",
                         if app.playing { "playing" } else { "paused" }

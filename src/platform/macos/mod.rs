@@ -12,6 +12,9 @@ use objc::{class, msg_send, sel, sel_impl};
 
 use crate::{MediaControlEvent, MediaMetadata, MediaPlayback};
 
+#[derive(Debug)]
+pub struct Error;
+
 pub struct MediaControls;
 
 impl MediaControls {
@@ -19,23 +22,27 @@ impl MediaControls {
         Self
     }
 
-    pub fn attach<F>(&mut self, event_handler: F)
+    pub fn attach<F>(&mut self, event_handler: F) -> Result<(), Error>
     where
         F: Fn(MediaControlEvent) + Send + 'static,
     {
         unsafe { attach_command_handlers(Arc::new(event_handler)) };
+        Ok(())
     }
 
-    pub fn detach(&mut self) {
+    pub fn detach(&mut self) -> Result<(), Error> {
         unsafe { detach_command_handlers() };
+        Ok(())
     }
 
-    pub fn set_playback(&mut self, playback: MediaPlayback) {
+    pub fn set_playback(&mut self, playback: MediaPlayback) -> Result<(), Error> {
         unsafe { set_playback_status(playback) };
+        Ok(())
     }
 
-    pub fn set_metadata(&mut self, metadata: MediaMetadata) {
+    pub fn set_metadata(&mut self, metadata: MediaMetadata) -> Result<(), Error> {
         unsafe { set_playback_metadata(metadata) };
+        Ok(())
     }
 }
 
