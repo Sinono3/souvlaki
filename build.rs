@@ -1,12 +1,19 @@
 #[cfg(target_os = "windows")]
 fn build_winapi() {
     windows::build!(
-        windows::media::{
+        Windows::Foundation::{TypedEventHandler, EventRegistrationToken},
+        Windows::Media::{
             SystemMediaTransportControls,
-            ISystemMediaTransportControls
+            SystemMediaTransportControlsDisplayUpdater,
+            SystemMediaTransportControlsButton,
+            SystemMediaTransportControlsButtonPressedEventArgs,
+            ISystemMediaTransportControls,
+            MediaPlaybackType,
+            MediaPlaybackStatus,
+            MusicDisplayProperties,
         },
-        windows::win32::windows_and_messaging::HWND,
-        windows::win32::media_transport::ISystemMediaTransportControlsInterop,
+        Windows::Win32::WindowsAndMessaging::HWND,
+        Windows::Win32::MediaTransport::ISystemMediaTransportControlsInterop,
     );
 }
 

@@ -21,11 +21,13 @@ fn main() {
 
     #[cfg(target_os = "windows")]
     let mut controls = {
+        use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
+
         let handle = match window.raw_window_handle() {
             RawWindowHandle::Windows(h) => h,
             _ => unreachable!(),
         };
-        MediaControls::create_for_window(handle).unwrap();
+        MediaControls::for_window(handle).unwrap()
     };
     #[cfg(target_os = "macos")]
     let mut controls = MediaControls::new();
