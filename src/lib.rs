@@ -24,3 +24,10 @@ pub enum MediaControlEvent {
     Next,
     Previous,
 }
+
+impl Drop for MediaControls {
+    fn drop(&mut self) {
+        // Ignores errors if there are any.
+        self.detach().ok();
+    }
+}
