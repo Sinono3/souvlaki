@@ -9,11 +9,12 @@ pub enum MediaPlayback {
     Playing,
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct MediaMetadata<'s> {
-    pub title: Option<&'s str>,
-    pub album: Option<&'s str>,
-    pub artist: Option<&'s str>,
+#[derive(Clone, PartialEq, Eq, Debug, Default)]
+pub struct MediaMetadata<'a> {
+    pub title: Option<&'a str>,
+    pub album: Option<&'a str>,
+    pub artist: Option<&'a str>,
+    pub cover_url: Option<&'a str>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

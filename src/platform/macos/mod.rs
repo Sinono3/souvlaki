@@ -1,13 +1,18 @@
 #![cfg(target_os = "macos")]
 #![allow(non_upper_case_globals)]
 
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
 
 use block::ConcreteBlock;
 use cocoa::{
     base::{id, nil, NO, YES},
-    foundation::{NSInteger, NSString, NSUInteger},
+    foundation::{NSInteger, NSSize, NSString, NSUInteger},
 };
+use core_graphics::geometry::CGSize;
+use dispatch::{Queue, QueuePriority};
 use objc::{class, msg_send, sel, sel_impl};
 
 use crate::{MediaControlEvent, MediaMetadata, MediaPlayback};
@@ -58,6 +63,7 @@ extern "C" {
     static MPMediaItemPropertyTitle: id; // NSString
     static MPMediaItemPropertyArtist: id; // NSString
     static MPMediaItemPropertyAlbumTitle: id; // NSString
+    static MPMediaItemPropertyArtwork: id; // NSString
 }
 
 unsafe fn set_playback_status(playback: MediaPlayback) {
@@ -70,7 +76,10 @@ unsafe fn set_playback_status(playback: MediaPlayback) {
     let _: () = msg_send!(media_center, setPlaybackState: state);
 }
 
+static GLOBAL_METADATA_COUNTER: AtomicUsize = AtomicUsize::new(1);
+
 unsafe fn set_playback_metadata(metadata: MediaMetadata) {
+    let prev_counter = GLOBAL_METADATA_COUNTER.fetch_add(1, Ordering::SeqCst);
     let media_center: id = msg_send!(class!(MPNowPlayingInfoCenter), defaultCenter);
     let now_playing: id = msg_send!(class!(NSMutableDictionary), dictionary);
     if let Some(title) = metadata.title {
@@ -85,6 +94,30 @@ unsafe fn set_playback_metadata(metadata: MediaMetadata) {
         let _: () = msg_send!(now_playing, setObject: ns_string(album)
                                               forKey: MPMediaItemPropertyAlbumTitle);
     }
+    if let Some(cover_url) = metadata.cover_url {
+        let cover_url = cover_url.to_owned();
+        Queue::global(QueuePriority::Default).exec_async(move || {
+            load_and_set_playback_artwork(ns_url(&cover_url), prev_counter + 1);
+        });
+    }
+    let _: () = msg_send!(media_center, setNowPlayingInfo: now_playing);
+}
+
+unsafe fn load_and_set_playback_artwork(url: id, for_counter: usize) {
+    let (image, size) = ns_image_from_url(url);
+    let artwork = mp_artwork(image, size);
+    if GLOBAL_METADATA_COUNTER.load(Ordering::SeqCst) == for_counter {
+        set_playback_artwork(artwork);
+    }
+}
+
+unsafe fn set_playback_artwork(artwork: id) {
+    let media_center: id = msg_send!(class!(MPNowPlayingInfoCenter), defaultCenter);
+    let now_playing: id = msg_send!(class!(NSMutableDictionary), dictionary);
+    let prev_now_playing: id = msg_send!(media_center, nowPlayingInfo);
+    let _: () = msg_send!(now_playing, addEntriesFromDictionary: prev_now_playing);
+    let _: () = msg_send!(now_playing, setObject: artwork
+                                          forKey: MPMediaItemPropertyArtwork);
     let _: () = msg_send!(media_center, setNowPlayingInfo: now_playing);
 }
 
@@ -183,4 +216,24 @@ unsafe fn detach_command_handlers() {
 
 unsafe fn ns_string(value: &str) -> id {
     NSString::alloc(nil).init_str(value)
+}
+
+unsafe fn ns_url(value: &str) -> id {
+    let url: id = msg_send!(class!(NSURL), URLWithString: ns_string(value));
+    url
+}
+
+unsafe fn ns_image_from_url(url: id) -> (id, CGSize) {
+    let image: id = msg_send!(class!(NSImage), alloc);
+    let image: id = msg_send!(image, initWithContentsOfURL: url);
+    let size: NSSize = msg_send!(image, size);
+    (image, CGSize::new(size.width, size.height))
+}
+
+unsafe fn mp_artwork(image: id, bounds: CGSize) -> id {
+    let handler = ConcreteBlock::new(move |_size: CGSize| -> id { image }).copy();
+    let artwork: id = msg_send!(class!(MPMediaItemArtwork), alloc);
+    let artwork: id = msg_send!(artwork, initWithBoundsSize: bounds
+                                         requestHandler: handler);
+    artwork
 }

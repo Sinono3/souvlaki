@@ -51,6 +51,7 @@ fn main() {
             title: Some("When The Sun Hits"),
             album: Some("Souvlaki"),
             artist: Some("Slowdive"),
+            ..MediaMetadata::default()
         })
         .unwrap();
 
