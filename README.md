@@ -1,3 +1,7 @@
+[![Crates.io](https://img.shields.io/crates/v/souvlaki.svg)](https://crates.io/crates/souvlaki)
+[![Docs](https://docs.rs/souvlaki/badge.svg)](https://docs.rs/souvlaki)
+[![CI](https://github.com/Sinono3/souvlaki/actions/workflows/build.yml/badge.svg)](https://github.com/Sinono3/souvlaki/actions/workflows/build.yml)
+
 # Souvlaki
 
 A (not yet) cross-platform solution to OS media controls.
