@@ -25,3 +25,6 @@ objc = "0.2.7"
 
 [target.'cfg(target_os = "macos")'.dev-dependencies]
 winit = "0.25.0"
+
+[package.metadata.docs.rs]
+targets = ["x86_64-apple-darwin", "x86_64-pc-windows-msvc"]

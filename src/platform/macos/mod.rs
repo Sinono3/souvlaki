@@ -205,7 +205,7 @@ unsafe fn detach_command_handlers() {
     let _: () = msg_send!(cmd, setEnabled: NO);
     let _: () = msg_send!(cmd, removeTarget: nil);
 
-    let cmd: id = msg_send!(command_center, previousTrackComand);
+    let cmd: id = msg_send!(command_center, previousTrackCommand);
     let _: () = msg_send!(cmd, setEnabled: NO);
     let _: () = msg_send!(cmd, removeTarget: nil);
 
