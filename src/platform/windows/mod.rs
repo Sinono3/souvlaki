@@ -1,14 +1,17 @@
 #![cfg(target_os = "windows")]
 
-mod bindings;
+mod bindings {
+    ::windows::include_bindings!();
+}
 
 use self::bindings::Windows as win;
 use raw_window_handle::windows::WindowsHandle;
-use win::Foundation::TypedEventHandler;
+use win::Foundation::{TypedEventHandler, Uri};
 use win::Media::*;
+use win::Storage::Streams::RandomAccessStreamReference;
 use win::Win32::MediaTransport::ISystemMediaTransportControlsInterop;
 use win::Win32::WindowsAndMessaging::HWND;
-use windows::{Abi, Interface};
+use windows::{Abi, HString, Interface};
 
 use crate::{MediaControlEvent, MediaMetadata, MediaPlayback};
 
@@ -37,7 +40,8 @@ impl From<windows::Error> for Error {
 impl MediaControls {
     pub fn for_window(window_handle: WindowsHandle) -> Result<Self, Error> {
         let interop: ISystemMediaTransportControlsInterop =
-            windows::factory::<SystemMediaTransportControls, ISystemMediaTransportControlsInterop>()?;
+            windows::factory::<SystemMediaTransportControls, ISystemMediaTransportControlsInterop>(
+            )?;
 
         let mut smtc: Option<SystemMediaTransportControls> = None;
         unsafe {
@@ -107,7 +111,8 @@ impl MediaControls {
             MediaPlayback::Paused => SmtcPlayback::Paused as i32,
             MediaPlayback::Stopped => SmtcPlayback::Stopped as i32,
         };
-        self.controls.SetPlaybackStatus(MediaPlaybackStatus(status))?;
+        self.controls
+            .SetPlaybackStatus(MediaPlaybackStatus(status))?;
         Ok(())
     }
 
@@ -122,6 +127,11 @@ impl MediaControls {
         }
         if let Some(album) = metadata.album {
             properties.SetAlbumTitle(album)?;
+        }
+        if let Some(url) = metadata.cover_url {
+            let stream =
+                RandomAccessStreamReference::CreateFromUri(Uri::CreateUri(HString::from(url))?)?;
+            self.display_updater.SetThumbnail(stream)?;
         }
 
         self.display_updater.Update()?;

@@ -1,7 +1,7 @@
 #[cfg(target_os = "windows")]
 fn build_winapi() {
     windows::build!(
-        Windows::Foundation::{TypedEventHandler, EventRegistrationToken},
+        Windows::Foundation::{TypedEventHandler, EventRegistrationToken, Uri},
         Windows::Media::{
             SystemMediaTransportControls,
             SystemMediaTransportControlsDisplayUpdater,
@@ -14,6 +14,7 @@ fn build_winapi() {
         },
         Windows::Win32::WindowsAndMessaging::HWND,
         Windows::Win32::MediaTransport::ISystemMediaTransportControlsInterop,
+        Windows::Storage::Streams::RandomAccessStreamReference,
     );
 }
 
