@@ -51,6 +51,7 @@ fn main() {
             title: Some("When The Sun Hits"),
             album: Some("Souvlaki"),
             artist: Some("Slowdive"),
+            cover_url: Some("https://c.pxhere.com/photos/34/c1/souvlaki_authentic_greek_greek_food_mezes-497780.jpg!d"),
         })
         .unwrap();
 
