@@ -8,12 +8,9 @@ A (not yet) cross-platform solution to OS media controls.
 
 ## Supported platforms
 
+- Linux (via MPRIS)
 - MacOS
 - Windows
-
-## Under development
-
-- MPRIS (Linux)
 
 ## Example
 
@@ -29,3 +26,7 @@ Soon.
 ## MacOS
 
 Screenshots coming soon.
+
+## Linux
+
+Coming soon.
