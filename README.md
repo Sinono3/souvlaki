@@ -34,7 +34,7 @@ Coming soon.
 The main struct is `MediaControls`. Each platform has to initialize it in a different way:
 
 - MacOS: `MediaControls::new()`. No arguments needed.
-- Linux: `MediaControls::new_with_name()`. Unfortunately in this case, a window needs to be opened to allow media controls.
+- Linux: `MediaControls::new_with_name(dbus_name, fancy_name)`. `dbus_name` should follow [the specifications](https://dbus.freedesktop.org/doc/dbus-specification.html#message-protocol-names-bus). The fancy name could be however you want. It represents what could be shown to the users.
 - Windows: `MediaControls::for_window(hwnd: WindowsHandle)`. Unfortunately in this case, a window needs to be opened to allow media controls. The argument required is a `WindowsHandle` found in the `raw-window-handle` crate.
 
 So, an example full cross-platform app would look like this:
@@ -43,7 +43,7 @@ So, an example full cross-platform app would look like this:
 use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata};
 
 #[cfg(target_os = "linux")]
-let mut controls = MediaControls::new_with_name("my-player", "My Player");
+let mut controls = MediaControls::new_with_name("my_player", "My Player");
 #[cfg(target_os = "macos")]
 let mut controls = MediaControls::new();
 #[cfg(target_os = "windows")]
