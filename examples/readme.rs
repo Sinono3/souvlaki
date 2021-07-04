@@ -1,6 +1,6 @@
-fn main() {
-    use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata};
+use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata};
 
+fn main() {
     #[cfg(target_os = "linux")]
     let mut controls = MediaControls::new_with_name("my_player", "My Player");
     #[cfg(target_os = "macos")]
@@ -9,27 +9,14 @@ fn main() {
     let mut controls = {
         use raw_window_handle::windows::WindowsHandle;
 
+        // No window creation in this example for the sake of simplicity
         let handle: WindowsHandle = unimplemented!();
         MediaControls::for_window(handle).unwrap()
     };
 
-    let mut playing = false;
-    let mut number = 100i32;
-
     // The closure must be Send and have a static lifetime.
     controls
-        .attach(move |event| {
-            match event {
-                MediaControlEvent::Play => playing = true,
-                MediaControlEvent::Pause => playing = false,
-                MediaControlEvent::Toggle => playing = !playing,
-                MediaControlEvent::Next => number += 1,
-                MediaControlEvent::Previous => number -= 1,
-                _ => (),
-            }
-            println!("playing: {}", playing);
-            println!("number: {}", number);
-        })
+        .attach(|event: MediaControlEvent| println!("Event received: {:?}", event))
         .unwrap();
 
     // Update the media metadata.
