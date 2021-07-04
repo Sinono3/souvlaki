@@ -2,7 +2,7 @@ fn main() {
     use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata};
 
     #[cfg(target_os = "linux")]
-    let mut controls = MediaControls::new_with_name("my-player", "My Player");
+    let mut controls = MediaControls::new_with_name("my_player", "My Player");
     #[cfg(target_os = "macos")]
     let mut controls = MediaControls::new();
     #[cfg(target_os = "windows")]
