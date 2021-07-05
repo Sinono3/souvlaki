@@ -28,6 +28,7 @@ struct MprisData {
     dbus_name: String,
     friendly_name: String,
     metadata: OwnedMetadata,
+    playback_status: MediaPlayback
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
@@ -50,14 +51,15 @@ impl From<MediaMetadata<'_>> for OwnedMetadata {
 }
 
 impl MediaControls {
-    pub fn new_with_name<S>(dbus_name: S, friendly_name: S) -> Self 
-    where 
-        S: ToString
+    pub fn new_with_name<S>(dbus_name: S, friendly_name: S) -> Self
+    where
+        S: ToString,
     {
         let shared_data = Arc::new(Mutex::new(MprisData {
             dbus_name: dbus_name.to_string(),
             friendly_name: friendly_name.to_string(),
             metadata: Default::default(),
+            playback_status: MediaPlayback::Stopped,
         }));
 
         Self {
@@ -97,7 +99,9 @@ impl MediaControls {
         Ok(())
     }
 
-    pub fn set_playback(&mut self, _playback: MediaPlayback) -> Result<(), Error> {
+    pub fn set_playback(&mut self, playback: MediaPlayback) -> Result<(), Error> {
+        let mut data = self.shared_data.lock().unwrap();
+        data.playback_status = playback;
         Ok(())
     }
 
@@ -157,11 +161,26 @@ fn mpris_run(
         // TODO: placeholder, seek unimplemented
         b.property("CanSeek").get(|_, _| Ok(false));
 
-        b.property("Metadata").get(move |_, _| {
-            // TODO: this could be stored in a cache in `shared_data`.
-            let mut dict = HashMap::<String, Variant<Box<dyn RefArg>>>::new();
+        b.property("PlaybackStatus").get({
+            let shared_data = shared_data.clone();
+            move |_, _| {
+                let data = shared_data.lock().unwrap();
+                let status = match data.playback_status {
+                    MediaPlayback::Playing => "Playing",
+                    MediaPlayback::Paused => "Paused",
+                    MediaPlayback::Stopped => "Stopped",
+                };
+                Ok(status.to_string())
+            }
+        });
 
-            if let Ok(data) = shared_data.lock() {
+        b.property("Metadata").get({ 
+            let shared_data = shared_data.clone();
+            move |_, _| {
+                // TODO: this could be stored in a cache in `shared_data`.
+                let mut dict = HashMap::<String, Variant<Box<dyn RefArg>>>::new();
+
+                let data = shared_data.lock().unwrap();
                 let mut insert = |k: &str, v| dict.insert(k.to_string(), Variant(v));
 
                 let OwnedMetadata {
@@ -187,9 +206,9 @@ fn mpris_run(
                 if let Some(cover_url) = cover_url {
                     insert("mpris:artUrl", Box::new(cover_url.clone()));
                 }
-            }
 
-            Ok(dict)
+                Ok(dict)
+            }
         });
 
         register_method(b, &event_handler, "Play", MediaControlEvent::Play);
