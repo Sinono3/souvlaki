@@ -1,7 +1,4 @@
-use std::{
-    collections::VecDeque,
-    sync::{Arc, Mutex},
-};
+use std::{sync::mpsc, thread::sleep, time::Duration};
 
 use souvlaki::{MediaControlEvent, MediaControls};
 use souvlaki::{MediaMetadata, MediaPlayback};
@@ -13,10 +10,12 @@ use winit::{
 
 struct TestApp {
     playing: bool,
+    song_index: u8,
 }
 
 fn main() {
     let event_loop = EventLoop::new();
+    #[allow(unused_variables)]
     let window = WindowBuilder::new().build(&event_loop).unwrap();
 
     #[cfg(target_os = "windows")]
@@ -31,20 +30,24 @@ fn main() {
     };
     #[cfg(target_os = "macos")]
     let mut controls = MediaControls::new();
-    #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+    #[cfg(target_os = "linux")]
+    let mut controls =
+        MediaControls::new_with_name("souvlaki-example", "Souvlaki media keys example");
+
+    #[cfg(all(
+        not(target_os = "windows"),
+        not(target_os = "macos"),
+        not(target_os = "linux")
+    ))]
     let mut controls = MediaControls::new();
 
-    let pending_events = Arc::new(Mutex::new(VecDeque::new()));
-    let mut app = TestApp { playing: true };
+    let (tx, rx) = mpsc::sync_channel(32);
+    let mut app = TestApp {
+        playing: true,
+        song_index: 0,
+    };
 
-    controls
-        .attach({
-            let pending_events = pending_events.clone();
-            move |event| {
-                pending_events.lock().unwrap().push_back(event);
-            }
-        })
-        .unwrap();
+    controls.attach(move |e| tx.send(e).unwrap()).unwrap();
     controls.set_playback(MediaPlayback::Playing).unwrap();
     controls
         .set_metadata(MediaMetadata {
@@ -66,17 +69,19 @@ fn main() {
             Event::MainEventsCleared => {
                 let mut change = false;
 
-                if let Ok(mut events) = pending_events.try_lock() {
-                    while let Some(event) = events.pop_front() {
-                        match event {
-                            MediaControlEvent::Toggle => app.playing = !app.playing,
-                            MediaControlEvent::Play => app.playing = true,
-                            MediaControlEvent::Pause => app.playing = false,
-                            _ => {}
+                for event in rx.try_iter() {
+                    match event {
+                        MediaControlEvent::Toggle => app.playing = !app.playing,
+                        MediaControlEvent::Play => app.playing = true,
+                        MediaControlEvent::Pause => app.playing = false,
+                        MediaControlEvent::Next => app.song_index = app.song_index.wrapping_add(1),
+                        MediaControlEvent::Previous => {
+                            app.song_index = app.song_index.wrapping_sub(1)
                         }
-                        change = true;
                     }
+                    change = true;
                 }
+                sleep(Duration::from_millis(50));
 
                 if change {
                     controls
@@ -86,9 +91,11 @@ fn main() {
                             MediaPlayback::Paused
                         })
                         .unwrap();
+
                     eprintln!(
-                        "App is now: {}",
-                        if app.playing { "playing" } else { "paused" }
+                        "{} (song {})",
+                        if app.playing { "Playing" } else { "Paused" },
+                        app.song_index
                     );
                 }
             }
