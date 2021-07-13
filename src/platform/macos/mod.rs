@@ -1,9 +1,12 @@
 #![cfg(target_os = "macos")]
 #![allow(non_upper_case_globals)]
 
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc,
+use std::{
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+    time::Duration,
 };
 
 use block::ConcreteBlock;
@@ -64,16 +67,27 @@ extern "C" {
     static MPMediaItemPropertyArtist: id; // NSString
     static MPMediaItemPropertyAlbumTitle: id; // NSString
     static MPMediaItemPropertyArtwork: id; // NSString
+    static MPMediaItemPropertyPlaybackDuration: id; // NSString
+    static MPNowPlayingInfoPropertyElapsedPlaybackTime: id; // NSString
 }
 
 unsafe fn set_playback_status(playback: MediaPlayback) {
     let media_center: id = msg_send!(class!(MPNowPlayingInfoCenter), defaultCenter);
     let state = match playback {
         MediaPlayback::Stopped => MPNowPlayingPlaybackStateStopped,
-        MediaPlayback::Paused => MPNowPlayingPlaybackStatePaused,
-        MediaPlayback::Playing => MPNowPlayingPlaybackStatePlaying,
+        MediaPlayback::Paused { .. } => MPNowPlayingPlaybackStatePaused,
+        MediaPlayback::Playing { .. } => MPNowPlayingPlaybackStatePlaying,
     };
     let _: () = msg_send!(media_center, setPlaybackState: state);
+    if let MediaPlayback::Paused {
+        progress: Some(progress),
+    }
+    | MediaPlayback::Playing {
+        progress: Some(progress),
+    } = playback
+    {
+        set_playback_progress(progress);
+    }
 }
 
 static GLOBAL_METADATA_COUNTER: AtomicUsize = AtomicUsize::new(1);
@@ -93,6 +107,10 @@ unsafe fn set_playback_metadata(metadata: MediaMetadata) {
     if let Some(album) = metadata.album {
         let _: () = msg_send!(now_playing, setObject: ns_string(album)
                                               forKey: MPMediaItemPropertyAlbumTitle);
+    }
+    if let Some(duration) = metadata.duration {
+        let _: () = msg_send!(now_playing, setObject: ns_number(duration.as_secs_f64())
+                                              forKey: MPMediaItemPropertyPlaybackDuration);
     }
     if let Some(cover_url) = metadata.cover_url {
         let cover_url = cover_url.to_owned();
@@ -118,6 +136,16 @@ unsafe fn set_playback_artwork(artwork: id) {
     let _: () = msg_send!(now_playing, addEntriesFromDictionary: prev_now_playing);
     let _: () = msg_send!(now_playing, setObject: artwork
                                           forKey: MPMediaItemPropertyArtwork);
+    let _: () = msg_send!(media_center, setNowPlayingInfo: now_playing);
+}
+
+unsafe fn set_playback_progress(progress: Duration) {
+    let media_center: id = msg_send!(class!(MPNowPlayingInfoCenter), defaultCenter);
+    let now_playing: id = msg_send!(class!(NSMutableDictionary), dictionary);
+    let prev_now_playing: id = msg_send!(media_center, nowPlayingInfo);
+    let _: () = msg_send!(now_playing, addEntriesFromDictionary: prev_now_playing);
+    let _: () = msg_send!(now_playing, setObject: ns_number(progress.as_secs_f64())
+                                          forKey: MPNowPlayingInfoPropertyElapsedPlaybackTime);
     let _: () = msg_send!(media_center, setNowPlayingInfo: now_playing);
 }
 
@@ -216,6 +244,11 @@ unsafe fn detach_command_handlers() {
 
 unsafe fn ns_string(value: &str) -> id {
     NSString::alloc(nil).init_str(value)
+}
+
+unsafe fn ns_number(value: f64) -> id {
+    let number: id = msg_send!(class!(NSNumber), numberWithDouble: value);
+    number
 }
 
 unsafe fn ns_url(value: &str) -> id {

@@ -107,8 +107,8 @@ impl MediaControls {
 
     pub fn set_playback(&mut self, playback: MediaPlayback) -> Result<(), Error> {
         let status = match playback {
-            MediaPlayback::Playing => SmtcPlayback::Playing as i32,
-            MediaPlayback::Paused => SmtcPlayback::Paused as i32,
+            MediaPlayback::Playing { .. } => SmtcPlayback::Playing as i32,
+            MediaPlayback::Paused { .. } => SmtcPlayback::Paused as i32,
             MediaPlayback::Stopped => SmtcPlayback::Stopped as i32,
         };
         self.controls
