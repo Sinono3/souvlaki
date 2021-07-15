@@ -1,8 +1,9 @@
 #![cfg(target_os = "linux")]
 
-use crate::{MediaControlEvent, MediaMetadata, MediaPlayback};
+use crate::{MediaControlEvent, MediaMetadata, MediaPlayback, MediaPosition, SeekDirection};
 use dbus::blocking::Connection;
 use dbus::channel::MatchingReceiver;
+use dbus::strings::Path as DbusPath;
 use dbus::Error as DbusError;
 use dbus_crossroads::{Crossroads, IfaceBuilder};
 use std::collections::HashMap;
@@ -132,20 +133,25 @@ fn mpris_run(
 
     let mut cr = Crossroads::new();
 
-    let media_player_2 = cr.register("org.mpris.MediaPlayer2", move |b| {
-        b.property("Identity")
-            .get(move |_, _| Ok(friendly_name.clone()));
+    let media_player_2 = cr.register("org.mpris.MediaPlayer2", {
+        let event_handler = event_handler.clone();
 
-        // TODO: Everything in here is placeholder
-        b.method("Raise", (), (), move |_, _, _: ()| Ok(()));
-        b.method("Quit", (), (), move |_, _, _: ()| Ok(()));
-        b.property("CanQuit").get(|_, _| Ok(false));
-        b.property("CanRaise").get(|_, _| Ok(false));
-        b.property("HasTracklist").get(|_, _| Ok(false));
-        b.property("SupportedUriSchemes")
-            .get(move |_, _| Ok(&[] as &[String]));
-        b.property("SupportedMimeTypes")
-            .get(move |_, _| Ok(&[] as &[String]));
+        move |b| {
+            b.property("Identity")
+                .get(move |_, _| Ok(friendly_name.clone()));
+
+            register_method(b, &event_handler, "Raise", MediaControlEvent::Raise);
+            register_method(b, &event_handler, "Quit", MediaControlEvent::Quit);
+
+            // TODO: allow user to set these properties
+            b.property("CanQuit").get(|_, _| Ok(true));
+            b.property("CanRaise").get(|_, _| Ok(true));
+            b.property("HasTracklist").get(|_, _| Ok(false));
+            b.property("SupportedUriSchemes")
+                .get(move |_, _| Ok(&[] as &[String]));
+            b.property("SupportedMimeTypes")
+                .get(move |_, _| Ok(&[] as &[String]));
+        }
     });
 
     let player = cr.register("org.mpris.MediaPlayer2.Player", move |b| {
@@ -157,9 +163,7 @@ fn mpris_run(
         b.property("CanPause").get(|_, _| Ok(true));
         b.property("CanGoNext").get(|_, _| Ok(true));
         b.property("CanGoPrevious").get(|_, _| Ok(true));
-
-        // TODO: placeholder, seek unimplemented
-        b.property("CanSeek").get(|_, _| Ok(false));
+        b.property("CanSeek").get(|_, _| Ok(true));
 
         b.property("PlaybackStatus").get({
             let shared_data = shared_data.clone();
@@ -190,10 +194,19 @@ fn mpris_run(
                     ref cover_url,
                 } = data.metadata;
 
-                // TODO: For some reason the properties don't follow an order.
-                // Probably because of the use of HashMap. Can't use `dbus::arg::Dict`
-                // though, because it isn't Send.
+                // TODO: For some reason the properties don't follow the order when
+                // queried from the D-Bus. Probably because of the use of HashMap.
+                // Can't use `dbus::arg::Dict` though, because it isn't Send.
 
+                // MPRIS
+                // TODO: trackid (must be a d-bus path)
+                // TODO: length
+
+                if let Some(cover_url) = cover_url {
+                    insert("mpris:artUrl", Box::new(cover_url.clone()));
+                }
+
+                // Xesam
                 if let Some(title) = title {
                     insert("xesam:title", Box::new(title.clone()));
                 }
@@ -202,9 +215,6 @@ fn mpris_run(
                 }
                 if let Some(album) = album {
                     insert("xesam:album", Box::new(album.clone()));
-                }
-                if let Some(cover_url) = cover_url {
-                    insert("mpris:artUrl", Box::new(cover_url.clone()));
                 }
 
                 Ok(dict)
@@ -216,6 +226,54 @@ fn mpris_run(
         register_method(b, &event_handler, "PlayPause", MediaControlEvent::Toggle);
         register_method(b, &event_handler, "Next", MediaControlEvent::Next);
         register_method(b, &event_handler, "Previous", MediaControlEvent::Previous);
+        register_method(b, &event_handler, "Stop", MediaControlEvent::Stop);
+
+        b.method("Seek", ("Offset",), (), {
+            let event_handler = event_handler.clone();
+
+            move |_, _, (offset,): (i64,)| {
+                let abs_offset = offset.abs() as u64;
+                let direction = if offset > 0 {
+                    SeekDirection::Forward
+                } else {
+                    SeekDirection::Backward
+                };
+
+                (event_handler.lock().unwrap())(MediaControlEvent::SeekBy(
+                    direction,
+                    Duration::from_micros(abs_offset),
+                ));
+                Ok(())
+            }
+        });
+
+        b.method("SetPosition", ("TrackId", "Position"), (), {
+            move |_, _, (_trackid, position): (DbusPath, i64)| {
+                // According to the MPRIS specification:
+
+                // 1.
+                // If the TrackId argument is not the same as the current
+                // trackid, the call is ignored as stale. So here we check that.
+                // (Maybe it should be optional?)
+
+                // TODO: the check. (We first need to store the TrackId somewhere)
+
+                // 2.
+                // If the Position argument is less than 0, do nothing.
+                // If the Position argument is greater than the track length, do nothing.
+
+                if position < 0 {
+                    return Ok(());
+                }
+
+                let position: u64 = position.abs() as u64;
+
+                (event_handler.lock().unwrap())(MediaControlEvent::SetPosition(MediaPosition(
+                    Duration::from_micros(position),
+                )));
+                Ok(())
+            }
+        });
     });
 
     cr.insert("/org/mpris/MediaPlayer2", &[media_player_2, player], ());
@@ -250,7 +308,7 @@ fn register_method(
     let event_handler = event_handler.clone();
 
     b.method(name, (), (), move |_, _, _: ()| {
-        (event_handler.lock().unwrap())(event);
+        (event_handler.lock().unwrap())(event.clone());
         Ok(())
     });
 }
