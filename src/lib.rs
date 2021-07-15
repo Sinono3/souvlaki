@@ -4,13 +4,11 @@ use std::time::Duration;
 
 pub use platform::{Error, MediaControls};
 
-use std::time::Duration;
-
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum MediaPlayback {
     Stopped,
-    Paused { progress: Option<Duration> },
-    Playing { progress: Option<Duration> },
+    Paused { progress: Option<MediaPosition> },
+    Playing { progress: Option<MediaPosition> },
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
@@ -44,8 +42,8 @@ pub enum MediaControlEvent {
     Quit,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 /// An instant in a media item.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct MediaPosition(pub Duration);
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
