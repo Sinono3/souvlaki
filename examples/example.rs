@@ -48,12 +48,15 @@ fn main() {
     };
 
     controls.attach(move |e| tx.send(e).unwrap()).unwrap();
-    controls.set_playback(MediaPlayback::Playing).unwrap();
+    controls
+        .set_playback(MediaPlayback::Playing { progress: None })
+        .unwrap();
     controls
         .set_metadata(MediaMetadata {
             title: Some("When The Sun Hits"),
             album: Some("Souvlaki"),
             artist: Some("Slowdive"),
+            duration: Some(Duration::from_secs_f64(4.0 * 60.0 + 50.0)),
             cover_url: Some("https://c.pxhere.com/photos/34/c1/souvlaki_authentic_greek_greek_food_mezes-497780.jpg!d"),
         })
         .unwrap();
@@ -86,9 +89,9 @@ fn main() {
                 if change {
                     controls
                         .set_playback(if app.playing {
-                            MediaPlayback::Playing
+                            MediaPlayback::Playing { progress: None }
                         } else {
-                            MediaPlayback::Paused
+                            MediaPlayback::Paused { progress: None }
                         })
                         .unwrap();
 
