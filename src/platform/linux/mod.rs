@@ -29,7 +29,7 @@ struct MprisData {
     dbus_name: String,
     friendly_name: String,
     metadata: OwnedMetadata,
-    playback_status: MediaPlayback
+    playback_status: MediaPlayback,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
@@ -178,7 +178,7 @@ fn mpris_run(
             }
         });
 
-        b.property("Metadata").get({ 
+        b.property("Metadata").get({
             let shared_data = shared_data.clone();
             move |_, _| {
                 // TODO: this could be stored in a cache in `shared_data`.
