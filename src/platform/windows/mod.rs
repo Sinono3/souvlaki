@@ -9,9 +9,9 @@ use raw_window_handle::windows::WindowsHandle;
 use win::Foundation::{TypedEventHandler, Uri};
 use win::Media::*;
 use win::Storage::Streams::RandomAccessStreamReference;
-use win::Win32::MediaTransport::ISystemMediaTransportControlsInterop;
-use win::Win32::WindowsAndMessaging::HWND;
-use windows::{Abi, HString, Interface};
+use win::Win32::Foundation::HWND;
+use win::Win32::System::WinRT::ISystemMediaTransportControlsInterop;
+use windows::HSTRING;
 
 use crate::{MediaControlEvent, MediaMetadata, MediaPlayback};
 
@@ -43,16 +43,8 @@ impl MediaControls {
             windows::factory::<SystemMediaTransportControls, ISystemMediaTransportControlsInterop>(
             )?;
 
-        let mut smtc: Option<SystemMediaTransportControls> = None;
-        unsafe {
-            interop.GetForWindow(
-                HWND(window_handle.hwnd as isize),
-                &SystemMediaTransportControls::IID as *const _,
-                smtc.set_abi(),
-            )
-        }
-        .unwrap();
-        let controls = smtc.unwrap();
+        let controls: SystemMediaTransportControls =
+            unsafe { interop.GetForWindow(HWND(window_handle.hwnd as isize)) }?;
         let display_updater = controls.DisplayUpdater()?;
 
         Ok(Self {
@@ -130,7 +122,7 @@ impl MediaControls {
         }
         if let Some(url) = metadata.cover_url {
             let stream =
-                RandomAccessStreamReference::CreateFromUri(Uri::CreateUri(HString::from(url))?)?;
+                RandomAccessStreamReference::CreateFromUri(Uri::CreateUri(HSTRING::from(url))?)?;
             self.display_updater.SetThumbnail(stream)?;
         }
 

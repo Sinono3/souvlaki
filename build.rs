@@ -12,8 +12,8 @@ fn build_winapi() {
             MediaPlaybackStatus,
             MusicDisplayProperties,
         },
-        Windows::Win32::WindowsAndMessaging::HWND,
-        Windows::Win32::MediaTransport::ISystemMediaTransportControlsInterop,
+        Windows::Win32::Foundation::HWND,
+        Windows::Win32::System::WinRT::ISystemMediaTransportControlsInterop,
         Windows::Storage::Streams::RandomAccessStreamReference,
     );
 }
