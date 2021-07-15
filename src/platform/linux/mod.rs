@@ -271,6 +271,7 @@ fn mpris_run(
         });
 
         b.method("SetPosition", ("TrackId", "Position"), (), {
+            let event_handler = event_handler.clone();
             let shared_data = shared_data.clone();
 
             move |_, _, (_trackid, position): (DbusPath, i64)| {
@@ -303,6 +304,13 @@ fn mpris_run(
                 (event_handler.lock().unwrap())(MediaControlEvent::SetPosition(MediaPosition(
                     Duration::from_micros(position),
                 )));
+                Ok(())
+            }
+        });
+
+        b.method("OpenUri", ("Uri",), (), {
+            move |_, _, (uri,): (String,)| {
+                (event_handler.lock().unwrap())(MediaControlEvent::OpenUri(uri));
                 Ok(())
             }
         });
