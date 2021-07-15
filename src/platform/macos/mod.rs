@@ -86,7 +86,7 @@ unsafe fn set_playback_status(playback: MediaPlayback) {
         progress: Some(progress),
     } = playback
     {
-        set_playback_progress(progress);
+        set_playback_progress(progress.0);
     }
 }
 

@@ -170,8 +170,8 @@ fn mpris_run(
             move |_, _| {
                 let data = shared_data.lock().unwrap();
                 let status = match data.playback_status {
-                    MediaPlayback::Playing => "Playing",
-                    MediaPlayback::Paused => "Paused",
+                    MediaPlayback::Playing { .. } => "Playing",
+                    MediaPlayback::Paused { .. } => "Paused",
                     MediaPlayback::Stopped => "Stopped",
                 };
                 Ok(status.to_string())
