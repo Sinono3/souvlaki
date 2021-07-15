@@ -217,7 +217,9 @@ fn mpris_run(
                 // Can't use `dbus::arg::Dict` though, because it isn't Send.
 
                 // MPRIS
-                // TODO: trackid (must be a d-bus path)
+                
+                // TODO: this is just a workaround to enable SetPosition.
+                insert("mpris:trackid", Box::new(DbusPath::new("/").unwrap()));
 
                 if let Some(length) = duration {
                     insert("mpris:length", Box::new(*length));
@@ -269,7 +271,10 @@ fn mpris_run(
         });
 
         b.method("SetPosition", ("TrackId", "Position"), (), {
+            let shared_data = shared_data.clone();
+
             move |_, _, (_trackid, position): (DbusPath, i64)| {
+                let data = shared_data.lock().unwrap();
                 // According to the MPRIS specification:
 
                 // 1.
@@ -287,7 +292,13 @@ fn mpris_run(
                     return Ok(());
                 }
 
-                let position: u64 = position.abs() as u64;
+                if let Some(duration) = data.metadata.duration {
+                    if position > duration {
+                        return Ok(());
+                    }
+                }
+
+                let position: u64 = position.try_into().unwrap();
 
                 (event_handler.lock().unwrap())(MediaControlEvent::SetPosition(MediaPosition(
                     Duration::from_micros(position),
