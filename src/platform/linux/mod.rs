@@ -11,6 +11,7 @@ use std::convert::From;
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
+use std::convert::TryInto;
 
 #[derive(Debug)]
 pub struct Error;
@@ -38,6 +39,7 @@ struct OwnedMetadata {
     pub album: Option<String>,
     pub artist: Option<String>,
     pub cover_url: Option<String>,
+    pub duration: Option<i64>,
 }
 
 impl From<MediaMetadata<'_>> for OwnedMetadata {
@@ -47,6 +49,7 @@ impl From<MediaMetadata<'_>> for OwnedMetadata {
             artist: other.artist.map(|s| s.to_string()),
             album: other.album.map(|s| s.to_string()),
             cover_url: other.cover_url.map(|s| s.to_string()),
+            duration: other.duration.map(|d| d.as_micros().try_into().unwrap())
         }
     }
 }
@@ -178,8 +181,22 @@ fn mpris_run(
             }
         });
 
+        b.property("Position").get({
+            let shared_data = shared_data.clone();
+            move |_, _| {
+                let data = shared_data.lock().unwrap();
+                let progress: u64 = match data.playback_status {
+                    MediaPlayback::Playing { progress: Some(progress) } |
+                    MediaPlayback::Paused { progress: Some(progress) } => progress.0.as_micros(),
+                    _ => 0,
+                }.try_into().unwrap();
+                Ok(progress)
+            }
+        });
+
         b.property("Metadata").get({
             let shared_data = shared_data.clone();
+
             move |_, _| {
                 // TODO: this could be stored in a cache in `shared_data`.
                 let mut dict = HashMap::<String, Variant<Box<dyn RefArg>>>::new();
@@ -192,6 +209,7 @@ fn mpris_run(
                     ref album,
                     ref artist,
                     ref cover_url,
+                    ref duration,
                 } = data.metadata;
 
                 // TODO: For some reason the properties don't follow the order when
@@ -200,7 +218,10 @@ fn mpris_run(
 
                 // MPRIS
                 // TODO: trackid (must be a d-bus path)
-                // TODO: length
+
+                if let Some(length) = duration {
+                    insert("mpris:length", Box::new(*length));
+                }
 
                 if let Some(cover_url) = cover_url {
                     insert("mpris:artUrl", Box::new(cover_url.clone()));
