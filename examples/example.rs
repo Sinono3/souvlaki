@@ -81,6 +81,8 @@ fn main() {
                         MediaControlEvent::Previous => {
                             app.song_index = app.song_index.wrapping_sub(1)
                         }
+                        MediaControlEvent::Stop => app.playing = false,
+                        _ => (),
                     }
                     change = true;
                 }
