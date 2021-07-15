@@ -185,7 +185,7 @@ fn mpris_run(
             let shared_data = shared_data.clone();
             move |_, _| {
                 let data = shared_data.lock().unwrap();
-                let progress: u64 = match data.playback_status {
+                let progress: i64 = match data.playback_status {
                     MediaPlayback::Playing { progress: Some(progress) } |
                     MediaPlayback::Paused { progress: Some(progress) } => progress.0.as_micros(),
                     _ => 0,
