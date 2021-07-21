@@ -8,10 +8,10 @@ use dbus::Error as DbusError;
 use dbus_crossroads::{Crossroads, IfaceBuilder};
 use std::collections::HashMap;
 use std::convert::From;
+use std::convert::TryInto;
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
-use std::convert::TryInto;
 
 #[derive(Debug)]
 pub struct Error;
@@ -49,7 +49,7 @@ impl From<MediaMetadata<'_>> for OwnedMetadata {
             artist: other.artist.map(|s| s.to_string()),
             album: other.album.map(|s| s.to_string()),
             cover_url: other.cover_url.map(|s| s.to_string()),
-            duration: other.duration.map(|d| d.as_micros().try_into().unwrap())
+            duration: other.duration.map(|d| d.as_micros().try_into().unwrap()),
         }
     }
 }
@@ -186,10 +186,16 @@ fn mpris_run(
             move |_, _| {
                 let data = shared_data.lock().unwrap();
                 let progress: i64 = match data.playback_status {
-                    MediaPlayback::Playing { progress: Some(progress) } |
-                    MediaPlayback::Paused { progress: Some(progress) } => progress.0.as_micros(),
+                    MediaPlayback::Playing {
+                        progress: Some(progress),
+                    }
+                    | MediaPlayback::Paused {
+                        progress: Some(progress),
+                    } => progress.0.as_micros(),
                     _ => 0,
-                }.try_into().unwrap();
+                }
+                .try_into()
+                .unwrap();
                 Ok(progress)
             }
         });
