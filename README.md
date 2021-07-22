@@ -79,3 +79,4 @@ fn main() {
     // The controls automatically detach on drop.
 }
 ```
+[Check out this example here.](https://github.com/Sinono3/souvlaki/blob/master/examples/print_events.rs)
