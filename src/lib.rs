@@ -1,7 +1,9 @@
-pub mod platform;
+mod config;
+mod platform;
 
 use std::time::Duration;
 
+pub use config::*;
 pub use platform::{Error, MediaControls};
 
 #[derive(Clone, PartialEq, Eq, Debug)]

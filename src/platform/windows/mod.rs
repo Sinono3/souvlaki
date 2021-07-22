@@ -13,7 +13,7 @@ use win::Win32::Foundation::HWND;
 use win::Win32::System::WinRT::ISystemMediaTransportControlsInterop;
 use windows::HSTRING;
 
-use crate::{MediaControlEvent, MediaMetadata, MediaPlayback};
+use crate::{MediaControlEvent, MediaMetadata, MediaPlayback, PlatformConfig};
 
 pub struct MediaControls {
     controls: SystemMediaTransportControls,
@@ -38,13 +38,16 @@ impl From<windows::Error> for Error {
 }
 
 impl MediaControls {
-    pub fn for_window(window_handle: WindowsHandle) -> Result<Self, Error> {
+    pub fn new(config: PlatformConfig) -> Result<Self, Error> {
         let interop: ISystemMediaTransportControlsInterop =
             windows::factory::<SystemMediaTransportControls, ISystemMediaTransportControlsInterop>(
             )?;
+        let hwnd = config
+            .hwnd
+            .expect("Windows media controls require an HWND in MediaControlsOptions.");
 
         let controls: SystemMediaTransportControls =
-            unsafe { interop.GetForWindow(HWND(window_handle.hwnd as isize)) }?;
+            unsafe { interop.GetForWindow(HWND(options.hwnd as isize)) }?;
         let display_updater = controls.DisplayUpdater()?;
 
         Ok(Self {

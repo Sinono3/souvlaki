@@ -1,18 +1,24 @@
-use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata};
+use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, PlatformConfig};
 
 fn main() {
-    #[cfg(target_os = "linux")]
-    let mut controls = MediaControls::new_with_name("my_player", "My Player");
-    #[cfg(target_os = "macos")]
-    let mut controls = MediaControls::new();
+    #[cfg(not(target_os = "windows"))]
+    let hwnd = None;
+
     #[cfg(target_os = "windows")]
-    let mut controls = {
+    let hwnd = {
         use raw_window_handle::windows::WindowsHandle;
 
-        // No window creation in this example for the sake of simplicity
         let handle: WindowsHandle = unimplemented!();
-        MediaControls::for_window(handle).unwrap()
+        Some(handle.hwnd)
     };
+
+    let config = PlatformConfig {
+        dbus_name: "my_player",
+        display_name: "My Player",
+        hwnd,
+    };
+
+    let mut controls = MediaControls::new(config);
 
     // The closure must be Send and have a static lifetime.
     controls

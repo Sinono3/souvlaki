@@ -18,7 +18,7 @@ use core_graphics::geometry::CGSize;
 use dispatch::{Queue, QueuePriority};
 use objc::{class, msg_send, sel, sel_impl};
 
-use crate::{MediaControlEvent, MediaMetadata, MediaPlayback};
+use crate::{MediaControlEvent, MediaMetadata, MediaPlayback, PlatformConfig};
 
 #[derive(Debug)]
 pub struct Error;
@@ -26,7 +26,7 @@ pub struct Error;
 pub struct MediaControls;
 
 impl MediaControls {
-    pub fn new() -> Self {
+    pub fn new(_config: PlatformConfig) -> Self {
         Self
     }
 
