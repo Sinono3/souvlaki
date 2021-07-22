@@ -29,4 +29,4 @@ jobs:
       run: sudo apt-get install -y libdbus-1-dev pkg-config
       if: ${{ runner.os == 'Linux' }}
     - name: Build
-      run: cargo build --release --verbose
+      run: cargo build --release --all-targets --verbose 
