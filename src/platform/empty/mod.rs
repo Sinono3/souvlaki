@@ -1,4 +1,4 @@
-use crate::{MediaControlEvent, MediaMetadata, MediaPlayback};
+use crate::{MediaControlEvent, MediaMetadata, MediaPlayback, PlatformConfig};
 
 /// A platform-specific error.
 #[derive(Debug)]
@@ -9,7 +9,7 @@ pub struct MediaControls;
 
 impl MediaControls {
     /// Create media controls with the specified config.
-    pub fn new() -> Self {
+    pub fn new(_config: PlatformConfig) -> Result<Self, Error> {
         Self
     }
 
