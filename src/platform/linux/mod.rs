@@ -57,7 +57,7 @@ impl From<MediaMetadata<'_>> for OwnedMetadata {
 }
 
 impl MediaControls {
-    pub fn new(config: PlatformConfig) -> Self {
+    pub fn new(config: PlatformConfig) -> Result<Self, Error> {
         let PlatformConfig {
             dbus_name,
             display_name,
@@ -71,10 +71,10 @@ impl MediaControls {
             playback_status: MediaPlayback::Stopped,
         }));
 
-        Self {
+        Ok(Self {
             shared_data,
             thread: None,
-        }
+        })
     }
 
     pub fn attach<F>(&mut self, event_handler: F) -> Result<(), Error>

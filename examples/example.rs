@@ -22,11 +22,13 @@ fn main() {
 
     #[cfg(target_os = "windows")]
     let hwnd = {
+        use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
+
         let handle = match window.raw_window_handle() {
             RawWindowHandle::Windows(h) => h,
             _ => unreachable!(),
         };
-        config.hwnd = handle.hwnd;
+        Some(handle.hwnd)
     };
 
     let config = PlatformConfig {
@@ -35,7 +37,7 @@ fn main() {
         hwnd,
     };
 
-    let mut controls = MediaControls::new(config);
+    let mut controls = MediaControls::new(config).unwrap();
 
     let (tx, rx) = mpsc::sync_channel(32);
     let mut app = TestApp {

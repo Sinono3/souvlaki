@@ -26,8 +26,8 @@ pub struct Error;
 pub struct MediaControls;
 
 impl MediaControls {
-    pub fn new(_config: PlatformConfig) -> Self {
-        Self
+    pub fn new(_config: PlatformConfig) -> Result<Self, Error> {
+        Ok(Self)
     }
 
     pub fn attach<F>(&mut self, event_handler: F) -> Result<(), Error>

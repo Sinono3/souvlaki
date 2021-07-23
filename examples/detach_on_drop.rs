@@ -21,7 +21,7 @@ fn main() {
             hwnd,
         };
 
-        let mut controls = MediaControls::new(config);
+        let mut controls = MediaControls::new(config).unwrap();
 
         controls.attach(|_| println!("Received message")).unwrap();
         println!("Attached");

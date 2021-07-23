@@ -18,7 +18,7 @@ fn main() {
         hwnd,
     };
 
-    let mut controls = MediaControls::new(config);
+    let mut controls = MediaControls::new(config).unwrap();
 
     // The closure must be Send and have a static lifetime.
     controls
