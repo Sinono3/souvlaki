@@ -14,6 +14,7 @@ use windows::HSTRING;
 
 use crate::{MediaControlEvent, MediaMetadata, MediaPlayback, PlatformConfig};
 
+/// A handle to OS media controls.
 pub struct MediaControls {
     controls: SystemMediaTransportControls,
     display_updater: SystemMediaTransportControlsDisplayUpdater,
@@ -27,6 +28,7 @@ enum SmtcPlayback {
     Paused = 4,
 }
 
+/// A platform-specific error.
 #[derive(Debug)]
 pub struct Error(windows::Error);
 
@@ -37,6 +39,7 @@ impl From<windows::Error> for Error {
 }
 
 impl MediaControls {
+    /// Create media controls with the specified config.
     pub fn new(config: PlatformConfig) -> Result<Self, Error> {
         let interop: ISystemMediaTransportControlsInterop =
             windows::factory::<SystemMediaTransportControls, ISystemMediaTransportControlsInterop>(
@@ -55,6 +58,7 @@ impl MediaControls {
         })
     }
 
+    /// Attach the media control events to a handler.
     pub fn attach<F>(&mut self, event_handler: F) -> Result<(), Error>
     where
         F: Fn(MediaControlEvent) + Send + 'static,
@@ -93,12 +97,14 @@ impl MediaControls {
         Ok(())
     }
 
+    /// Detach the event handler.
     pub fn detach(&mut self) -> Result<(), Error> {
         self.controls.SetIsEnabled(false)?;
         self.controls.ButtonPressed(None)?;
         Ok(())
     }
 
+    /// Set the current playback status.
     pub fn set_playback(&mut self, playback: MediaPlayback) -> Result<(), Error> {
         let status = match playback {
             MediaPlayback::Playing { .. } => SmtcPlayback::Playing as i32,
@@ -110,6 +116,7 @@ impl MediaControls {
         Ok(())
     }
 
+    /// Set the metadata of the currently playing media item.
     pub fn set_metadata(&mut self, metadata: MediaMetadata) -> Result<(), Error> {
         let properties = self.display_updater.MusicProperties()?;
 

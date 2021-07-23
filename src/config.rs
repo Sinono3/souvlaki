@@ -7,6 +7,6 @@ pub struct PlatformConfig<'a> {
     pub display_name: &'a str,
     /// Should follow [the D-Bus spec](https://dbus.freedesktop.org/doc/dbus-specification.html#message-protocol-names-bus). (*Required on Linux*)
     pub dbus_name: &'a str,
-    /// A HWND. (*Required on Windows*)
+    /// An HWND. (*Required on Windows*)
     pub hwnd: Option<*mut c_void>,
 }

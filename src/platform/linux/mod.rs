@@ -15,9 +15,11 @@ use std::sync::{mpsc, Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
+/// A platform-specific error.
 #[derive(Debug)]
 pub struct Error;
 
+/// A handle to OS media controls.
 pub struct MediaControls {
     shared_data: Arc<Mutex<MprisData>>,
     thread: Option<DbusThread>,
@@ -57,6 +59,7 @@ impl From<MediaMetadata<'_>> for OwnedMetadata {
 }
 
 impl MediaControls {
+    /// Create media controls with the specified config.
     pub fn new(config: PlatformConfig) -> Result<Self, Error> {
         let PlatformConfig {
             dbus_name,
@@ -77,6 +80,7 @@ impl MediaControls {
         })
     }
 
+    /// Attach the media control events to a handler.
     pub fn attach<F>(&mut self, event_handler: F) -> Result<(), Error>
     where
         F: Fn(MediaControlEvent) + Send + 'static,
@@ -96,6 +100,7 @@ impl MediaControls {
         Ok(())
     }
 
+    /// Detach the event handler.
     pub fn detach(&mut self) -> Result<(), Error> {
         if let Some(DbusThread {
             kill_signal,
@@ -108,12 +113,14 @@ impl MediaControls {
         Ok(())
     }
 
+    /// Set the current playback status.
     pub fn set_playback(&mut self, playback: MediaPlayback) -> Result<(), Error> {
         let mut data = self.shared_data.lock().unwrap();
         data.playback_status = playback;
         Ok(())
     }
 
+    /// Set the metadata of the currently playing media item.
     pub fn set_metadata(&mut self, metadata: MediaMetadata) -> Result<(), Error> {
         if let Ok(mut data) = self.shared_data.lock() {
             data.metadata = metadata.into();
