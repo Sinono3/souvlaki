@@ -5,7 +5,6 @@ mod bindings {
 }
 
 use self::bindings::Windows as win;
-use raw_window_handle::windows::WindowsHandle;
 use win::Foundation::{TypedEventHandler, Uri};
 use win::Media::*;
 use win::Storage::Streams::RandomAccessStreamReference;
@@ -47,7 +46,7 @@ impl MediaControls {
             .expect("Windows media controls require an HWND in MediaControlsOptions.");
 
         let controls: SystemMediaTransportControls =
-            unsafe { interop.GetForWindow(HWND(options.hwnd as isize)) }?;
+            unsafe { interop.GetForWindow(HWND(config.hwnd as isize)) }?;
         let display_updater = controls.DisplayUpdater()?;
 
         Ok(Self {
