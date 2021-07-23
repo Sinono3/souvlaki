@@ -6,6 +6,8 @@ mod bindings {
 
 use self::bindings::Windows as win;
 use raw_window_handle::windows::WindowsHandle;
+use std::sync::Arc;
+use std::time::Duration;
 use win::Foundation::{TypedEventHandler, Uri};
 use win::Media::*;
 use win::Storage::Streams::RandomAccessStreamReference;
@@ -13,11 +15,12 @@ use win::Win32::Foundation::HWND;
 use win::Win32::System::WinRT::ISystemMediaTransportControlsInterop;
 use windows::HSTRING;
 
-use crate::{MediaControlEvent, MediaMetadata, MediaPlayback};
+use crate::{MediaControlEvent, MediaMetadata, MediaPlayback, MediaPosition, SeekDirection};
 
 pub struct MediaControls {
     controls: SystemMediaTransportControls,
     display_updater: SystemMediaTransportControlsDisplayUpdater,
+    timeline_properties: SystemMediaTransportControlsTimelineProperties,
 }
 
 #[repr(i32)]
@@ -46,10 +49,12 @@ impl MediaControls {
         let controls: SystemMediaTransportControls =
             unsafe { interop.GetForWindow(HWND(window_handle.hwnd as isize)) }?;
         let display_updater = controls.DisplayUpdater()?;
+        let timeline_properties = SystemMediaTransportControlsTimelineProperties::new()?;
 
         Ok(Self {
             controls,
             display_updater,
+            timeline_properties,
         })
     }
 
@@ -60,33 +65,67 @@ impl MediaControls {
         self.controls.SetIsEnabled(true)?;
         self.controls.SetIsPlayEnabled(true)?;
         self.controls.SetIsPauseEnabled(true)?;
+        self.controls.SetIsStopEnabled(true)?;
         self.controls.SetIsNextEnabled(true)?;
         self.controls.SetIsPreviousEnabled(true)?;
+        self.controls.SetIsFastForwardEnabled(true)?;
+        self.controls.SetIsRewindEnabled(true)?;
 
+        // TODO: allow changing this
         self.display_updater.SetType(MediaPlaybackType::Music)?;
 
-        let handler = TypedEventHandler::new(move |_, args: &Option<_>| {
-            let args: &SystemMediaTransportControlsButtonPressedEventArgs = args.as_ref().unwrap();
-            match args.Button()? {
-                SystemMediaTransportControlsButton::Play => {
-                    (event_handler)(MediaControlEvent::Play);
+        let event_handler = Arc::new(event_handler);
+
+        let button_handler = TypedEventHandler::new({
+            let event_handler = event_handler.clone();
+
+            move |_, args: &Option<_>| {
+                let args: &SystemMediaTransportControlsButtonPressedEventArgs =
+                    args.as_ref().unwrap();
+                match args.Button()? {
+                    SystemMediaTransportControlsButton::Play => {
+                        (event_handler)(MediaControlEvent::Play);
+                    }
+                    SystemMediaTransportControlsButton::Pause => {
+                        (event_handler)(MediaControlEvent::Pause);
+                    }
+                    SystemMediaTransportControlsButton::Stop => {
+                        (event_handler)(MediaControlEvent::Stop);
+                    }
+                    SystemMediaTransportControlsButton::Next => {
+                        (event_handler)(MediaControlEvent::Next);
+                    }
+                    SystemMediaTransportControlsButton::Previous => {
+                        (event_handler)(MediaControlEvent::Previous);
+                    }
+                    SystemMediaTransportControlsButton::FastForward => {
+                        (event_handler)(MediaControlEvent::Seek(SeekDirection::Forward));
+                    }
+                    SystemMediaTransportControlsButton::Rewind => {
+                        (event_handler)(MediaControlEvent::Seek(SeekDirection::Backward));
+                    }
+                    _ => {
+                        // Ignore unknown events.
+                    }
                 }
-                SystemMediaTransportControlsButton::Pause => {
-                    (event_handler)(MediaControlEvent::Pause);
-                }
-                SystemMediaTransportControlsButton::Next => {
-                    (event_handler)(MediaControlEvent::Next);
-                }
-                SystemMediaTransportControlsButton::Previous => {
-                    (event_handler)(MediaControlEvent::Previous);
-                }
-                _ => {
-                    // Ignore unknown events.
-                }
+                Ok(())
             }
-            Ok(())
         });
-        self.controls.ButtonPressed(handler)?;
+        self.controls.ButtonPressed(button_handler)?;
+
+        let position_handler = TypedEventHandler::new({
+            let event_handler = event_handler.clone();
+
+            move |_, args: &Option<_>| {
+                let args: &PlaybackPositionChangeRequestedEventArgs = args.as_ref().unwrap();
+                let position = Duration::from(args.RequestedPlaybackPosition()?);
+
+                (event_handler)(MediaControlEvent::SetPosition(MediaPosition(position)));
+                Ok(())
+            }
+        });
+        self.controls
+            .PlaybackPositionChangeRequested(position_handler)?;
 
         Ok(())
     }
@@ -105,6 +144,20 @@ impl MediaControls {
         };
         self.controls
             .SetPlaybackStatus(MediaPlaybackStatus(status))?;
+
+        let progress = match playback {
+            MediaPlayback::Playing {
+                progress: Some(progress),
+            }
+            | MediaPlayback::Paused {
+                progress: Some(progress),
+            } => progress.0,
+            _ => Duration::default(),
+        };
+        self.timeline_properties.SetPosition(progress)?;
+
+        self.controls
+            .UpdateTimelineProperties(self.timeline_properties.clone())?;
         Ok(())
     }
 
@@ -125,7 +178,15 @@ impl MediaControls {
                 RandomAccessStreamReference::CreateFromUri(Uri::CreateUri(HSTRING::from(url))?)?;
             self.display_updater.SetThumbnail(stream)?;
         }
+        let duration = metadata.duration.unwrap_or_default();
+        self.timeline_properties.SetStartTime(Duration::default())?;
+        self.timeline_properties
+            .SetMinSeekTime(Duration::default())?;
+        self.timeline_properties.SetEndTime(duration)?;
+        self.timeline_properties.SetMaxSeekTime(duration)?;
 
+        self.controls
+            .UpdateTimelineProperties(self.timeline_properties.clone())?;
         self.display_updater.Update()?;
         Ok(())
     }
