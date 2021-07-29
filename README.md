@@ -6,7 +6,7 @@
 
 # Souvlaki
 
-A cross-platform solution to OS media controls and metadata. One abstraction for Linux, MacOS and Windows.
+A cross-platform library for handling OS media controls and metadata. One abstraction for Linux, MacOS and Windows.
 
 ## Supported platforms
 
