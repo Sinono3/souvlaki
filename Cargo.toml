@@ -1,6 +1,6 @@
 [package]
 name = "souvlaki"
-version = "0.4.0"
+version = "0.4.1"
 authors = ["Sinono3 <aldoacevedo@protonmail.com>"]
 edition = "2018"
 description = "A cross-platform media key and metadata handling library."
@@ -30,4 +30,5 @@ dbus-crossroads = "0.4"
 winit = "0.25.0"
 
 [package.metadata.docs.rs]
+default-target = "x86_64-unknown-linux-gnu"
 targets = ["x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
