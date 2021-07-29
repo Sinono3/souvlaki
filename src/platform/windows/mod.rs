@@ -5,7 +5,6 @@ mod bindings {
 }
 
 use self::bindings::Windows as win;
-use raw_window_handle::windows::WindowsHandle;
 use std::sync::Arc;
 use std::time::Duration;
 use win::Foundation::{TypedEventHandler, Uri};
@@ -15,8 +14,9 @@ use win::Win32::Foundation::HWND;
 use win::Win32::System::WinRT::ISystemMediaTransportControlsInterop;
 use windows::HSTRING;
 
-use crate::{MediaControlEvent, MediaMetadata, MediaPlayback, MediaPosition, SeekDirection};
+use crate::{MediaControlEvent, MediaMetadata, MediaPlayback, PlatformConfig, MediaPosition, SeekDirection};
 
+/// A handle to OS media controls.
 pub struct MediaControls {
     controls: SystemMediaTransportControls,
     display_updater: SystemMediaTransportControlsDisplayUpdater,
@@ -31,6 +31,7 @@ enum SmtcPlayback {
     Paused = 4,
 }
 
+/// A platform-specific error.
 #[derive(Debug)]
 pub struct Error(windows::Error);
 
@@ -41,13 +42,17 @@ impl From<windows::Error> for Error {
 }
 
 impl MediaControls {
-    pub fn for_window(window_handle: WindowsHandle) -> Result<Self, Error> {
+    /// Create media controls with the specified config.
+    pub fn new(config: PlatformConfig) -> Result<Self, Error> {
         let interop: ISystemMediaTransportControlsInterop =
             windows::factory::<SystemMediaTransportControls, ISystemMediaTransportControlsInterop>(
             )?;
+        let hwnd = config
+            .hwnd
+            .expect("Windows media controls require an HWND in MediaControlsOptions.");
 
         let controls: SystemMediaTransportControls =
-            unsafe { interop.GetForWindow(HWND(window_handle.hwnd as isize)) }?;
+            unsafe { interop.GetForWindow(HWND(hwnd as isize)) }?;
         let display_updater = controls.DisplayUpdater()?;
         let timeline_properties = SystemMediaTransportControlsTimelineProperties::new()?;
 
@@ -58,6 +63,7 @@ impl MediaControls {
         })
     }
 
+    /// Attach the media control events to a handler.
     pub fn attach<F>(&mut self, event_handler: F) -> Result<(), Error>
     where
         F: Fn(MediaControlEvent) + Send + 'static,
@@ -130,12 +136,14 @@ impl MediaControls {
         Ok(())
     }
 
+    /// Detach the event handler.
     pub fn detach(&mut self) -> Result<(), Error> {
         self.controls.SetIsEnabled(false)?;
         self.controls.ButtonPressed(None)?;
         Ok(())
     }
 
+    /// Set the current playback status.
     pub fn set_playback(&mut self, playback: MediaPlayback) -> Result<(), Error> {
         let status = match playback {
             MediaPlayback::Playing { .. } => SmtcPlayback::Playing as i32,
@@ -161,6 +169,7 @@ impl MediaControls {
         Ok(())
     }
 
+    /// Set the metadata of the currently playing media item.
     pub fn set_metadata(&mut self, metadata: MediaMetadata) -> Result<(), Error> {
         let properties = self.display_updater.MusicProperties()?;
 

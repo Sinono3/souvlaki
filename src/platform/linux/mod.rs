@@ -1,6 +1,8 @@
 #![cfg(target_os = "linux")]
 
-use crate::{MediaControlEvent, MediaMetadata, MediaPlayback, MediaPosition, SeekDirection};
+use crate::{
+    MediaControlEvent, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig, SeekDirection,
+};
 use dbus::blocking::Connection;
 use dbus::channel::MatchingReceiver;
 use dbus::strings::Path as DbusPath;
@@ -13,9 +15,11 @@ use std::sync::{mpsc, Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
+/// A platform-specific error.
 #[derive(Debug)]
 pub struct Error;
 
+/// A handle to OS media controls.
 pub struct MediaControls {
     shared_data: Arc<Mutex<MprisData>>,
     thread: Option<DbusThread>,
@@ -55,23 +59,28 @@ impl From<MediaMetadata<'_>> for OwnedMetadata {
 }
 
 impl MediaControls {
-    pub fn new_with_name<S>(dbus_name: S, friendly_name: S) -> Self
-    where
-        S: ToString,
-    {
+    /// Create media controls with the specified config.
+    pub fn new(config: PlatformConfig) -> Result<Self, Error> {
+        let PlatformConfig {
+            dbus_name,
+            display_name,
+            ..
+        } = config;
+
         let shared_data = Arc::new(Mutex::new(MprisData {
             dbus_name: dbus_name.to_string(),
-            friendly_name: friendly_name.to_string(),
+            friendly_name: display_name.to_string(),
             metadata: Default::default(),
             playback_status: MediaPlayback::Stopped,
         }));
 
-        Self {
+        Ok(Self {
             shared_data,
             thread: None,
-        }
+        })
     }
 
+    /// Attach the media control events to a handler.
     pub fn attach<F>(&mut self, event_handler: F) -> Result<(), Error>
     where
         F: Fn(MediaControlEvent) + Send + 'static,
@@ -91,6 +100,7 @@ impl MediaControls {
         Ok(())
     }
 
+    /// Detach the event handler.
     pub fn detach(&mut self) -> Result<(), Error> {
         if let Some(DbusThread {
             kill_signal,
@@ -103,12 +113,14 @@ impl MediaControls {
         Ok(())
     }
 
+    /// Set the current playback status.
     pub fn set_playback(&mut self, playback: MediaPlayback) -> Result<(), Error> {
         let mut data = self.shared_data.lock().unwrap();
         data.playback_status = playback;
         Ok(())
     }
 
+    /// Set the metadata of the currently playing media item.
     pub fn set_metadata(&mut self, metadata: MediaMetadata) -> Result<(), Error> {
         if let Ok(mut data) = self.shared_data.lock() {
             data.metadata = metadata.into();
@@ -223,7 +235,7 @@ fn mpris_run(
                 // Can't use `dbus::arg::Dict` though, because it isn't Send.
 
                 // MPRIS
-                
+
                 // TODO: this is just a workaround to enable SetPosition.
                 insert("mpris:trackid", Box::new(DbusPath::new("/").unwrap()));
 

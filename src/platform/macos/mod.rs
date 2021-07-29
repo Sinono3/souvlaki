@@ -18,18 +18,22 @@ use core_graphics::geometry::CGSize;
 use dispatch::{Queue, QueuePriority};
 use objc::{class, msg_send, sel, sel_impl};
 
-use crate::{MediaControlEvent, MediaMetadata, MediaPlayback};
+use crate::{MediaControlEvent, MediaMetadata, MediaPlayback, PlatformConfig};
 
+/// A platform-specific error.
 #[derive(Debug)]
 pub struct Error;
 
+/// A handle to OS media controls.
 pub struct MediaControls;
 
 impl MediaControls {
-    pub fn new() -> Self {
-        Self
+    /// Create media controls with the specified config.
+    pub fn new(_config: PlatformConfig) -> Result<Self, Error> {
+        Ok(Self)
     }
 
+    /// Attach the media control events to a handler.
     pub fn attach<F>(&mut self, event_handler: F) -> Result<(), Error>
     where
         F: Fn(MediaControlEvent) + Send + 'static,
@@ -38,16 +42,19 @@ impl MediaControls {
         Ok(())
     }
 
+    /// Detach the event handler.
     pub fn detach(&mut self) -> Result<(), Error> {
         unsafe { detach_command_handlers() };
         Ok(())
     }
 
+    /// Set the current playback status.
     pub fn set_playback(&mut self, playback: MediaPlayback) -> Result<(), Error> {
         unsafe { set_playback_status(playback) };
         Ok(())
     }
 
+    /// Set the metadata of the currently playing media item.
     pub fn set_metadata(&mut self, metadata: MediaMetadata) -> Result<(), Error> {
         unsafe { set_playback_metadata(metadata) };
         Ok(())

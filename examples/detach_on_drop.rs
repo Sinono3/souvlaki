@@ -1,20 +1,27 @@
-use souvlaki::MediaControls;
+use souvlaki::{MediaControls, PlatformConfig};
 use std::thread::sleep;
 use std::time::Duration;
 
 fn main() {
     {
-        #[cfg(target_os = "linux")]
-        let mut controls = MediaControls::new_with_name("my_player", "My Player");
-        #[cfg(target_os = "macos")]
-        let mut controls = MediaControls::new();
+        #[cfg(not(target_os = "windows"))]
+        let hwnd = None;
+
         #[cfg(target_os = "windows")]
-        let mut controls = {
+        let hwnd = {
             use raw_window_handle::windows::WindowsHandle;
 
             let handle: WindowsHandle = unimplemented!();
-            MediaControls::for_window(handle).unwrap()
+            Some(handle.hwnd)
         };
+
+        let config = PlatformConfig {
+            dbus_name: "my_player",
+            display_name: "My Player",
+            hwnd,
+        };
+
+        let mut controls = MediaControls::new(config).unwrap();
 
         controls.attach(|_| println!("Received message")).unwrap();
         println!("Attached");

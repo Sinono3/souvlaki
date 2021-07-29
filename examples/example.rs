@@ -1,7 +1,6 @@
 use std::{sync::mpsc, thread::sleep, time::Duration};
 
-use souvlaki::{MediaControlEvent, MediaControls};
-use souvlaki::{MediaMetadata, MediaPlayback};
+use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, PlatformConfig};
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -18,28 +17,27 @@ fn main() {
     #[allow(unused_variables)]
     let window = WindowBuilder::new().build(&event_loop).unwrap();
 
+    #[cfg(not(target_os = "windows"))]
+    let hwnd = None;
+
     #[cfg(target_os = "windows")]
-    let mut controls = {
+    let hwnd = {
         use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
 
         let handle = match window.raw_window_handle() {
             RawWindowHandle::Windows(h) => h,
             _ => unreachable!(),
         };
-        MediaControls::for_window(handle).unwrap()
+        Some(handle.hwnd)
     };
-    #[cfg(target_os = "macos")]
-    let mut controls = MediaControls::new();
-    #[cfg(target_os = "linux")]
-    let mut controls =
-        MediaControls::new_with_name("souvlaki-example", "Souvlaki media keys example");
 
-    #[cfg(all(
-        not(target_os = "windows"),
-        not(target_os = "macos"),
-        not(target_os = "linux")
-    ))]
-    let mut controls = MediaControls::new();
+    let config = PlatformConfig {
+        dbus_name: "my_player",
+        display_name: "My Player",
+        hwnd,
+    };
+
+    let mut controls = MediaControls::new(config).unwrap();
 
     let (tx, rx) = mpsc::sync_channel(32);
     let mut app = TestApp {

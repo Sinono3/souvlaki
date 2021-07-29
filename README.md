@@ -31,30 +31,39 @@ Coming soon.
 
 ## Example
 
-The main struct is `MediaControls`. Each platform has to initialize it in a different way:
+The main struct is `MediaControls`. In order to create this struct you need a `PlatformConfig`. This struct contains all of the platform-specific requirements for spawning media controls. Here are the differences between the platforms:
 
-- MacOS: `MediaControls::new()`. No arguments needed.
-- Linux: `MediaControls::new_with_name(dbus_name, fancy_name)`. `dbus_name` should follow [the specifications](https://dbus.freedesktop.org/doc/dbus-specification.html#message-protocol-names-bus). The fancy name could be however you want. It represents what could be shown to the users.
-- Windows: `MediaControls::for_window(hwnd: WindowsHandle)`. Unfortunately in this case, a window needs to be opened to allow media controls. The argument required is a `WindowsHandle` found in the `raw-window-handle` crate.
+- MacOS: No config needed.
+- Linux: 
+	- `dbus_name`: The way your player will appear on D-Bus. It should follow [the D-Bus specification](https://dbus.freedesktop.org/doc/dbus-specification.html#message-protocol-names-bus). 
+	- `display_name`: This could be however you want. It's the name that will be shown to the users.
+- Windows: 
+	- `hwnd`: In this platform, a window needs to be opened to create media controls. The argument required is an `HWND`, a value of type `*mut c_void`. This value can be extracted when you open a window in your program, for example using the `raw_window_handle` in winit.
 
-So, an example full cross-platform app would look like this:
+A full cross-platform app would look like this:
 
 ```rust
-use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata};
+use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, PlatformConfig};
 
 fn main() {
-    #[cfg(target_os = "linux")]
-    let mut controls = MediaControls::new_with_name("my_player", "My Player");
-    #[cfg(target_os = "macos")]
-    let mut controls = MediaControls::new();
+    #[cfg(not(target_os = "windows"))]
+    let hwnd = None;
+
     #[cfg(target_os = "windows")]
-    let mut controls = {
+    let hwnd = {
         use raw_window_handle::windows::WindowsHandle;
 
-        // No window creation in this example for the sake of simplicity
         let handle: WindowsHandle = unimplemented!();
-        MediaControls::for_window(handle).unwrap()
+        Some(handle.hwnd)
     };
+
+    let config = PlatformConfig {
+        dbus_name: "my_player",
+        display_name: "My Player",
+        hwnd,
+    };
+
+    let mut controls = MediaControls::new(config);
 
     // The closure must be Send and have a static lifetime.
     controls
@@ -79,4 +88,5 @@ fn main() {
     // The controls automatically detach on drop.
 }
 ```
+
 [Check out this example here.](https://github.com/Sinono3/souvlaki/blob/master/examples/print_events.rs)
