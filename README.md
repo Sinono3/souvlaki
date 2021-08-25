@@ -90,3 +90,7 @@ fn main() {
 ```
 
 [Check out this example here.](https://github.com/Sinono3/souvlaki/blob/master/examples/print_events.rs)
+
+## Thanks 💗
+
+- To [jpochyla](https://github.com/jpochyla) for being a contributor to library architecture and the sole developer of MacOS support.
