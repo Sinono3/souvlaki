@@ -3,12 +3,15 @@
 use crate::{
     MediaControlEvent, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig, SeekDirection,
 };
+use std::collections::HashMap;
 use std::convert::From;
 use std::convert::TryFrom;
 use std::convert::TryInto;
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
+use zbus::{dbus_interface, SignalContext};
+use zvariant::{ObjectPath, Value};
 
 /// A platform-specific error.
 #[derive(Debug)]
@@ -133,10 +136,6 @@ impl MediaControls {
         channel.send(event).unwrap();
     }
 }
-
-use std::collections::HashMap;
-use zbus::{dbus_interface, SignalContext};
-use zvariant::{ObjectPath, Value};
 
 struct AppInterface {
     friendly_name: String,
@@ -275,9 +274,8 @@ impl PlayerInterface {
 
     #[dbus_interface(property)]
     fn metadata(&self) -> HashMap<&str, Value> {
-        // TODO: this could be stored in a cache in `shared_data`.
+        // TODO: this should be stored in a cache inside the state.
         let mut dict = HashMap::<&str, Value>::new();
-        //let mut insert = |k: &str, v: OwnedValue| dict.append(k.to_string().into(), v);
 
         let OwnedMetadata {
             ref title,
@@ -288,11 +286,9 @@ impl PlayerInterface {
         } = self.state.metadata;
 
         // MPRIS
-
-        // TODO: this is just a workaround to enable SetPosition.
-        //insert("mpris:trackid", ObjectPath::try_from("/").unwrap().into());
         dict.insert(
             "mpris:trackid",
+            // TODO: this is just a workaround to enable SetPosition.
             Value::new(ObjectPath::try_from("/").unwrap()),
         );
 

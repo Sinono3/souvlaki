@@ -14,7 +14,9 @@ use win::Win32::Foundation::HWND;
 use win::Win32::System::WinRT::ISystemMediaTransportControlsInterop;
 use windows::HSTRING;
 
-use crate::{MediaControlEvent, MediaMetadata, MediaPlayback, PlatformConfig, MediaPosition, SeekDirection};
+use crate::{
+    MediaControlEvent, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig, SeekDirection,
+};
 
 /// A handle to OS media controls.
 pub struct MediaControls {
