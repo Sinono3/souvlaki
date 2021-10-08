@@ -20,7 +20,8 @@ pub struct Error;
 /// A handle to OS media controls.
 pub struct MediaControls {
     thread: Option<ServiceThreadHandle>,
-    default_service_state: ServiceState,
+    dbus_name: String,
+    friendly_name: String,
 }
 
 struct ServiceThreadHandle {
@@ -37,8 +38,6 @@ enum InternalEvent {
 
 #[derive(Clone, Debug)]
 struct ServiceState {
-    dbus_name: String,
-    friendly_name: String,
     metadata: OwnedMetadata,
     playback_status: MediaPlayback,
 }
@@ -73,16 +72,10 @@ impl MediaControls {
             ..
         } = config;
 
-        let default_service_state = ServiceState {
-            dbus_name: dbus_name.to_string(),
-            friendly_name: display_name.to_string(),
-            metadata: Default::default(),
-            playback_status: MediaPlayback::Stopped,
-        };
-
         Ok(Self {
             thread: None,
-            default_service_state,
+            dbus_name: dbus_name.to_string(),
+            friendly_name: display_name.to_string(),
         })
     }
 
@@ -93,14 +86,16 @@ impl MediaControls {
     {
         self.detach()?;
 
-        let initial_state = self.default_service_state.clone();
+        let dbus_name = self.dbus_name.clone();
+        let friendly_name = self.friendly_name.clone();
         let event_handler = Arc::new(Mutex::new(event_handler));
         let (event_channel, rx) = mpsc::channel();
 
         self.thread = Some(ServiceThreadHandle {
             event_channel,
             thread: thread::spawn(move || {
-                pollster::block_on(run_service(initial_state, event_handler, rx)).unwrap();
+                pollster::block_on(run_service(dbus_name, friendly_name, event_handler, rx))
+                    .unwrap();
             }),
         });
         Ok(())
@@ -377,20 +372,24 @@ impl PlayerInterface {
 use zbus::Connection;
 
 async fn run_service(
-    initial_state: ServiceState,
+    dbus_name: String,
+    friendly_name: String,
     event_handler: Arc<Mutex<dyn Fn(MediaControlEvent) + Send + 'static>>,
     event_channel: mpsc::Receiver<InternalEvent>,
 ) -> zbus::Result<()> {
-    let name = format!("org.mpris.MediaPlayer2.{}", initial_state.dbus_name);
+    let name = format!("org.mpris.MediaPlayer2.{}", dbus_name);
     let connection = Connection::session().await?;
 
     let app = AppInterface {
-        friendly_name: initial_state.friendly_name.clone(),
+        friendly_name,
         event_handler: event_handler.clone(),
     };
 
     let player = PlayerInterface {
-        state: initial_state,
+        state: ServiceState {
+            metadata: OwnedMetadata::default(),
+            playback_status: MediaPlayback::Stopped,
+        },
         event_handler,
     };
 
