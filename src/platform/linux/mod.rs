@@ -300,7 +300,7 @@ impl PlayerInterface {
             dict.insert("xesam:title", Value::new(title.clone()));
         }
         if let Some(artist) = artist {
-            dict.insert("xesam:albumArtist", Value::new(artist.clone()));
+            dict.insert("xesam:albumArtist", Value::new(vec![artist.clone()]));
         }
         if let Some(album) = album {
             dict.insert("xesam:album", Value::new(album.clone()));
