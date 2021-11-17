@@ -10,7 +10,7 @@ pub struct MediaControls;
 impl MediaControls {
     /// Create media controls with the specified config.
     pub fn new(_config: PlatformConfig) -> Result<Self, Error> {
-        Self
+        Ok(Self)
     }
 
     /// Attach the media control events to a handler.
