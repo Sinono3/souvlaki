@@ -10,10 +10,17 @@ license = "MIT"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 raw-window-handle = "0.3.3"
-windows = "0.17.2"
 
-[target.'cfg(target_os = "windows")'.build-dependencies]
-windows = "0.17.2"
+[target.'cfg(target_os = "windows")'.dependencies.windows]
+version = "0.29.0"
+features = [
+    "alloc",
+	"Foundation",
+	"Media",
+	"Win32_Foundation",
+	"Win32_System_WinRT",
+	"Storage_Streams",
+]
 
 [target.'cfg(target_os = "macos")'.dependencies]
 block = "0.1.6"
