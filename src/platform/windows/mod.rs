@@ -1,18 +1,12 @@
 #![cfg(target_os = "windows")]
 
-mod bindings {
-    ::windows::include_bindings!();
-}
-
-use self::bindings::Windows as win;
 use std::sync::Arc;
 use std::time::Duration;
-use win::Foundation::{TypedEventHandler, Uri};
-use win::Media::*;
-use win::Storage::Streams::RandomAccessStreamReference;
-use win::Win32::Foundation::HWND;
-use win::Win32::System::WinRT::ISystemMediaTransportControlsInterop;
-use windows::HSTRING;
+use windows::core::{Error as WindowsError, HSTRING};
+use windows::Foundation::{TypedEventHandler, Uri};
+use windows::Media::*;
+use windows::Storage::Streams::RandomAccessStreamReference;
+use windows::Win32::System::WinRT::ISystemMediaTransportControlsInterop;
 
 use crate::{
     MediaControlEvent, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig, SeekDirection,
@@ -35,10 +29,10 @@ enum SmtcPlayback {
 
 /// A platform-specific error.
 #[derive(Debug)]
-pub struct Error(windows::Error);
+pub struct Error(WindowsError);
 
-impl From<windows::Error> for Error {
-    fn from(other: windows::Error) -> Error {
+impl From<WindowsError> for Error {
+    fn from(other: WindowsError) -> Error {
         Error(other)
     }
 }
@@ -46,15 +40,16 @@ impl From<windows::Error> for Error {
 impl MediaControls {
     /// Create media controls with the specified config.
     pub fn new(config: PlatformConfig) -> Result<Self, Error> {
-        let interop: ISystemMediaTransportControlsInterop =
-            windows::factory::<SystemMediaTransportControls, ISystemMediaTransportControlsInterop>(
-            )?;
+        let interop: ISystemMediaTransportControlsInterop = windows::core::factory::<
+            SystemMediaTransportControls,
+            ISystemMediaTransportControlsInterop,
+        >()?;
         let hwnd = config
             .hwnd
             .expect("Windows media controls require an HWND in MediaControlsOptions.");
 
         let controls: SystemMediaTransportControls =
-            unsafe { interop.GetForWindow(HWND(hwnd as isize)) }?;
+            unsafe { interop.GetForWindow(hwnd as isize) }?;
         let display_updater = controls.DisplayUpdater()?;
         let timeline_properties = SystemMediaTransportControlsTimelineProperties::new()?;
 
@@ -90,32 +85,28 @@ impl MediaControls {
             move |_, args: &Option<_>| {
                 let args: &SystemMediaTransportControlsButtonPressedEventArgs =
                     args.as_ref().unwrap();
-                match args.Button()? {
-                    SystemMediaTransportControlsButton::Play => {
-                        (event_handler)(MediaControlEvent::Play);
-                    }
-                    SystemMediaTransportControlsButton::Pause => {
-                        (event_handler)(MediaControlEvent::Pause);
-                    }
-                    SystemMediaTransportControlsButton::Stop => {
-                        (event_handler)(MediaControlEvent::Stop);
-                    }
-                    SystemMediaTransportControlsButton::Next => {
-                        (event_handler)(MediaControlEvent::Next);
-                    }
-                    SystemMediaTransportControlsButton::Previous => {
-                        (event_handler)(MediaControlEvent::Previous);
-                    }
-                    SystemMediaTransportControlsButton::FastForward => {
-                        (event_handler)(MediaControlEvent::Seek(SeekDirection::Forward));
-                    }
-                    SystemMediaTransportControlsButton::Rewind => {
-                        (event_handler)(MediaControlEvent::Seek(SeekDirection::Backward));
-                    }
-                    _ => {
-                        // Ignore unknown events.
-                    }
-                }
+                let button = args.Button()?;
+
+                let event = if button == SystemMediaTransportControlsButton::Play {
+                    MediaControlEvent::Play
+                } else if button == SystemMediaTransportControlsButton::Pause {
+                    MediaControlEvent::Pause
+                } else if button == SystemMediaTransportControlsButton::Stop {
+                    MediaControlEvent::Stop
+                } else if button == SystemMediaTransportControlsButton::Next {
+                    MediaControlEvent::Next
+                } else if button == SystemMediaTransportControlsButton::Previous {
+                    MediaControlEvent::Previous
+                } else if button == SystemMediaTransportControlsButton::FastForward {
+                    MediaControlEvent::Seek(SeekDirection::Forward)
+                } else if button == SystemMediaTransportControlsButton::Rewind {
+                    MediaControlEvent::Seek(SeekDirection::Backward)
+                } else {
+                    // Ignore unknown events
+                    return Ok(());
+                };
+
+                event_handler(event);
                 Ok(())
             }
         });
