@@ -437,7 +437,7 @@ where
             }
 
             let properties_changed = PropertiesPropertiesChanged {
-                interface_name: "org.mpris.MediaPlayer2".to_owned(),
+                interface_name: "org.mpris.MediaPlayer2.Player".to_owned(),
                 changed_properties,
                 invalidated_properties: Vec::new(),
             };
