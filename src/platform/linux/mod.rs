@@ -86,7 +86,7 @@ fn create_metadata_dict(metadata: &OwnedMetadata) -> HashMap<String, Variant<Box
         insert("xesam:title", Box::new(title.clone()));
     }
     if let Some(artist) = artist {
-        insert("xesam:albumArtist", Box::new(vec![artist.clone()]));
+        insert("xesam:artist", Box::new(vec![artist.clone()]));
     }
     if let Some(album) = album {
         insert("xesam:album", Box::new(album.clone()));
