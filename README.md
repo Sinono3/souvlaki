@@ -21,13 +21,32 @@ A cross-platform library for handling OS media controls and metadata. One abstra
 - Play and pause polling.\
 ![play_pause](https://user-images.githubusercontent.com/8389938/106080917-bdf36b80-60f6-11eb-98b5-f3071ae3eab6.gif)
 
+## Linux
+
+GNOME:
+
+![GNOME](https://user-images.githubusercontent.com/59307989/150836249-3270c4fc-78b9-4b8d-8d50-dd030b72b631.png)
+
+playerctl:
+
+```shell
+# In one shell
+$ cd souvlaki 
+$ cargo run --example example
+
+# In another shell
+$ playerctl metadata
+my_player xesam:artist              Slowdive
+my_player xesam:album               Souvlaki
+my_player mpris:artUrl              https://c.pxhere.com/photos/34/c1/souvlaki_authentic_greek_greek_food_mezes-497780.jpg!d
+my_player mpris:trackid             '/'
+my_player mpris:length              290000000
+my_player xesam:title               When The Sun Hits
+```
+
 ## MacOS
 
 Screenshots coming soon.
-
-## Linux
-
-Coming soon.
 
 ## Example
 
