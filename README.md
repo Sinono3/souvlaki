@@ -46,7 +46,10 @@ my_player xesam:title               When The Sun Hits
 
 ## MacOS
 
-Screenshots coming soon.
+- Control Center:\
+![Control Center](https://user-images.githubusercontent.com/434125/171526539-ecb07a74-5dc5-4f4b-8305-4a99d4d5c31c.png)
+- Now Playing:\
+![Now Playing](https://user-images.githubusercontent.com/434125/171526759-9232be58-63ed-4eea-ac15-aa50258d8254.png)
 
 ## Example
 
