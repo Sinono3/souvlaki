@@ -8,12 +8,12 @@ mod platform;
 #[path = "macos/mod.rs"]
 mod platform;
 
-#[cfg(target_os = "linux")]
-#[path = "linux/mod.rs"]
+#[cfg(target_os = "unix")]
+#[path = "unix/mod.rs"]
 mod platform;
 
 #[cfg(all(
-    not(target_os = "linux"),
+    not(target_os = "unix"),
     not(target_os = "windows"),
     not(target_os = "macos")
 ))]

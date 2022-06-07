@@ -1,4 +1,4 @@
-#![cfg(target_os = "linux")]
+#![cfg(target_os = "unix")]
 
 use crate::{
     MediaControlEvent, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig, SeekDirection,
