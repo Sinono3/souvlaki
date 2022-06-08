@@ -1,10 +1,6 @@
-[![Crates.io](https://img.shields.io/crates/v/souvlaki.svg)](https://crates.io/crates/souvlaki)
-[![Docs](https://docs.rs/souvlaki/badge.svg)](https://docs.rs/souvlaki)
-[![CI](https://github.com/Sinono3/souvlaki/actions/workflows/build.yml/badge.svg)](https://github.com/Sinono3/souvlaki/actions/workflows/build.yml)
 
-<sub>DISCLAIMER: the project is still in an early state. All parts may be subject to change.</sub>
 
-# Souvlaki
+# Souvlaki [![Crates.io](https://img.shields.io/crates/v/souvlaki.svg)](https://crates.io/crates/souvlaki) [![Docs](https://docs.rs/souvlaki/badge.svg)](https://docs.rs/souvlaki) [![CI](https://github.com/Sinono3/souvlaki/actions/workflows/build.yml/badge.svg)](https://github.com/Sinono3/souvlaki/actions/workflows/build.yml)
 
 A cross-platform library for handling OS media controls and metadata. One abstraction for Linux, MacOS and Windows.
 
@@ -23,12 +19,10 @@ A cross-platform library for handling OS media controls and metadata. One abstra
 
 ## Linux
 
-GNOME:
-
+- GNOME: \
 ![GNOME](https://user-images.githubusercontent.com/59307989/150836249-3270c4fc-78b9-4b8d-8d50-dd030b72b631.png)
 
-playerctl:
-
+- playerctl:
 ```shell
 # In one shell
 $ cd souvlaki 
