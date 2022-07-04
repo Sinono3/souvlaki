@@ -45,18 +45,18 @@ my_player xesam:title               When The Sun Hits
 - Now Playing:\
 ![Now Playing](https://user-images.githubusercontent.com/434125/171526759-9232be58-63ed-4eea-ac15-aa50258d8254.png)
 
-## Example
+## Usage
 
 The main struct is `MediaControls`. In order to create this struct you need a `PlatformConfig`. This struct contains all of the platform-specific requirements for spawning media controls. Here are the differences between the platforms:
 
-- MacOS: No config needed.
+- MacOS: No config needed, but requires a window to be open ([#23](https://github.com/Sinono3/souvlaki/issues/23))
 - Linux: 
 	- `dbus_name`: The way your player will appear on D-Bus. It should follow [the D-Bus specification](https://dbus.freedesktop.org/doc/dbus-specification.html#message-protocol-names-bus). 
 	- `display_name`: This could be however you want. It's the name that will be shown to the users.
 - Windows: 
 	- `hwnd`: In this platform, a window needs to be opened to create media controls. The argument required is an `HWND`, a value of type `*mut c_void`. This value can be extracted when you open a window in your program, for example using the `raw_window_handle` in winit.
 
-A full cross-platform app would look like this:
+## Example
 
 ```rust
 use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, PlatformConfig};
