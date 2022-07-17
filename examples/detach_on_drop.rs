@@ -9,9 +9,9 @@ fn main() {
 
         #[cfg(target_os = "windows")]
         let hwnd = {
-            use raw_window_handle::windows::WindowsHandle;
+            use raw_window_handle::Win32Handle;
 
-            let handle: WindowsHandle = unimplemented!();
+            let handle: Win32Handle = unimplemented!();
             Some(handle.hwnd)
         };
 

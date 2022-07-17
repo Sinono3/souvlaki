@@ -25,7 +25,7 @@ fn main() {
         use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
 
         let handle = match window.raw_window_handle() {
-            RawWindowHandle::Windows(h) => h,
+            RawWindowHandle::Win32(h) => h,
             _ => unreachable!(),
         };
         Some(handle.hwnd)

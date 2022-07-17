@@ -6,6 +6,7 @@ use windows::core::{Error as WindowsError, HSTRING};
 use windows::Foundation::{TypedEventHandler, Uri};
 use windows::Media::*;
 use windows::Storage::Streams::RandomAccessStreamReference;
+use windows::Win32::Foundation::HWND;
 use windows::Win32::System::WinRT::ISystemMediaTransportControlsInterop;
 
 use crate::{
@@ -49,7 +50,7 @@ impl MediaControls {
             .expect("Windows media controls require an HWND in MediaControlsOptions.");
 
         let controls: SystemMediaTransportControls =
-            unsafe { interop.GetForWindow(hwnd as isize) }?;
+            unsafe { interop.GetForWindow(HWND(hwnd as isize)) }?;
         let display_updater = controls.DisplayUpdater()?;
         let timeline_properties = SystemMediaTransportControlsTimelineProperties::new()?;
 
@@ -63,7 +64,7 @@ impl MediaControls {
     /// Attach the media control events to a handler.
     pub fn attach<F>(&mut self, event_handler: F) -> Result<(), Error>
     where
-        F: Fn(MediaControlEvent) + Send + 'static,
+        F: Fn(MediaControlEvent) + Send + Sync + 'static,
     {
         self.controls.SetIsEnabled(true)?;
         self.controls.SetIsPlayEnabled(true)?;
