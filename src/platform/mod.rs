@@ -15,6 +15,9 @@ mod platform;
 #[cfg(all(
     not(target_os = "linux"),
     not(target_os = "netbsd"),
+    not(target_os = "freebsd"),
+    not(target_os = "openbsd"),
+    not(target_os = "dragonfly"),
     not(target_os = "windows"),
     not(target_os = "macos")
 ))]
