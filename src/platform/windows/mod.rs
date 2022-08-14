@@ -1,11 +1,12 @@
 #![cfg(target_os = "windows")]
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use windows::core::{Error as WindowsError, HSTRING};
 use windows::Foundation::{TypedEventHandler, Uri};
 use windows::Media::*;
 use windows::Storage::Streams::RandomAccessStreamReference;
+use windows::Win32::Foundation::HWND;
 use windows::Win32::System::WinRT::ISystemMediaTransportControlsInterop;
 
 use crate::{
@@ -49,7 +50,7 @@ impl MediaControls {
             .expect("Windows media controls require an HWND in MediaControlsOptions.");
 
         let controls: SystemMediaTransportControls =
-            unsafe { interop.GetForWindow(hwnd as isize) }?;
+            unsafe { interop.GetForWindow(HWND(hwnd as isize)) }?;
         let display_updater = controls.DisplayUpdater()?;
         let timeline_properties = SystemMediaTransportControlsTimelineProperties::new()?;
 
@@ -77,7 +78,7 @@ impl MediaControls {
         // TODO: allow changing this
         self.display_updater.SetType(MediaPlaybackType::Music)?;
 
-        let event_handler = Arc::new(event_handler);
+        let event_handler = Arc::new(Mutex::new(event_handler));
 
         let button_handler = TypedEventHandler::new({
             let event_handler = event_handler.clone();
@@ -106,11 +107,11 @@ impl MediaControls {
                     return Ok(());
                 };
 
-                event_handler(event);
+                (event_handler.lock().unwrap())(event);
                 Ok(())
             }
         });
-        self.controls.ButtonPressed(button_handler)?;
+        self.controls.ButtonPressed(&button_handler)?;
 
         let position_handler = TypedEventHandler::new({
             let event_handler = event_handler.clone();
@@ -119,12 +120,12 @@ impl MediaControls {
                 let args: &PlaybackPositionChangeRequestedEventArgs = args.as_ref().unwrap();
                 let position = Duration::from(args.RequestedPlaybackPosition()?);
 
-                (event_handler)(MediaControlEvent::SetPosition(MediaPosition(position)));
+                (event_handler.lock().unwrap())(MediaControlEvent::SetPosition(MediaPosition(position)));
                 Ok(())
             }
         });
         self.controls
-            .PlaybackPositionChangeRequested(position_handler)?;
+            .PlaybackPositionChangeRequested(&position_handler)?;
 
         Ok(())
     }
@@ -155,10 +156,10 @@ impl MediaControls {
             } => progress.0,
             _ => Duration::default(),
         };
-        self.timeline_properties.SetPosition(progress)?;
+        self.timeline_properties.SetPosition(progress.into())?;
 
         self.controls
-            .UpdateTimelineProperties(self.timeline_properties.clone())?;
+            .UpdateTimelineProperties(&self.timeline_properties)?;
         Ok(())
     }
 
@@ -167,28 +168,29 @@ impl MediaControls {
         let properties = self.display_updater.MusicProperties()?;
 
         if let Some(title) = metadata.title {
-            properties.SetTitle(title)?;
+            properties.SetTitle(&HSTRING::from(title))?;
         }
         if let Some(artist) = metadata.artist {
-            properties.SetArtist(artist)?;
+            properties.SetArtist(&HSTRING::from(artist))?;
         }
         if let Some(album) = metadata.album {
-            properties.SetAlbumTitle(album)?;
+            properties.SetAlbumTitle(&HSTRING::from(album))?;
         }
         if let Some(url) = metadata.cover_url {
-            let stream =
-                RandomAccessStreamReference::CreateFromUri(Uri::CreateUri(HSTRING::from(url))?)?;
-            self.display_updater.SetThumbnail(stream)?;
+            let uri = Uri::CreateUri(&HSTRING::from(url))?;
+            let stream = RandomAccessStreamReference::CreateFromUri(&uri)?;
+            self.display_updater.SetThumbnail(&stream)?;
         }
         let duration = metadata.duration.unwrap_or_default();
-        self.timeline_properties.SetStartTime(Duration::default())?;
         self.timeline_properties
-            .SetMinSeekTime(Duration::default())?;
-        self.timeline_properties.SetEndTime(duration)?;
-        self.timeline_properties.SetMaxSeekTime(duration)?;
+            .SetStartTime(Duration::default().into())?;
+        self.timeline_properties
+            .SetMinSeekTime(Duration::default().into())?;
+        self.timeline_properties.SetEndTime(duration.into())?;
+        self.timeline_properties.SetMaxSeekTime(duration.into())?;
 
         self.controls
-            .UpdateTimelineProperties(self.timeline_properties.clone())?;
+            .UpdateTimelineProperties(&self.timeline_properties)?;
         self.display_updater.Update()?;
         Ok(())
     }
