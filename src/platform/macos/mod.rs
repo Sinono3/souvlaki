@@ -18,7 +18,7 @@ use core_graphics::geometry::CGSize;
 use dispatch::{Queue, QueuePriority};
 use objc::{class, msg_send, sel, sel_impl};
 
-use crate::{MediaControlEvent, MediaMetadata, MediaPlayback, PlatformConfig};
+use crate::{MediaControlEvent, MediaMetadata, MediaPlayback, PlatformConfig, MediaPosition};
 
 /// A platform-specific error.
 #[derive(Debug)]
@@ -223,6 +223,21 @@ unsafe fn attach_command_handlers(handler: Arc<dyn Fn(MediaControlEvent)>) {
     let cmd: id = msg_send!(command_center, nextTrackCommand);
     let _: () = msg_send!(cmd, setEnabled: YES);
     let _: () = msg_send!(cmd, addTargetWithHandler: next_track_handler);
+
+    // changePlaybackPositionCommand
+    let position_handler = ConcreteBlock::new({
+        let handler = handler.clone();
+        // event of type MPChangePlaybackPositionCommandEvent
+        move |event: id| -> NSInteger {
+            let position = event.as_ref().unwrap().get_ivar::<f64>("_positionTime").clone();
+            (handler)(MediaControlEvent::SetPosition(MediaPosition(Duration::from_secs_f64(position))));
+            MPRemoteCommandHandlerStatusSuccess
+        }
+    })
+    .copy();
+    let cmd: id = msg_send!(command_center, changePlaybackPositionCommand);
+    let _: () = msg_send!(cmd, setEnabled: YES);
+    let _: () = msg_send!(cmd, addTargetWithHandler: position_handler);
 }
 
 unsafe fn detach_command_handlers() {
@@ -245,6 +260,10 @@ unsafe fn detach_command_handlers() {
     let _: () = msg_send!(cmd, removeTarget: nil);
 
     let cmd: id = msg_send!(command_center, nextTrackCommand);
+    let _: () = msg_send!(cmd, setEnabled: NO);
+    let _: () = msg_send!(cmd, removeTarget: nil);
+
+    let cmd: id = msg_send!(command_center, changePlaybackPositionCommand);
     let _: () = msg_send!(cmd, setEnabled: NO);
     let _: () = msg_send!(cmd, removeTarget: nil);
 }
