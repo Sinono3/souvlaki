@@ -27,7 +27,9 @@ jobs:
         toolchain: stable
     - uses: Swatinem/rust-cache@v1
     - name: Install Dependencies
-      run: sudo apt-get install -y libdbus-1-dev pkg-config
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libdbus-1-dev pkg-config
       if: ${{ runner.os == 'Linux' }}
     - name: Build
       run: cargo build --release --all-targets --verbose 
