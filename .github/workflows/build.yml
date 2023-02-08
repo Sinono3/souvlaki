@@ -32,4 +32,7 @@ jobs:
         sudo apt-get install -y libdbus-1-dev pkg-config
       if: ${{ runner.os == 'Linux' }}
     - name: Build
-      run: cargo build --release --all-targets --verbose 
+      run: cargo build --release --all-targets --verbose
+    - name: Build zbus
+      run: cargo build --release --all-targets --verbose --no-default-features --features=use_zbus
+      if: ${{ runner.os == 'Linux' }}
