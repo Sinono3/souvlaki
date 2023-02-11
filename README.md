@@ -56,6 +56,19 @@ The main struct is `MediaControls`. In order to create this struct you need a `P
 - Windows: 
 	- `hwnd`: In this platform, a window needs to be opened to create media controls. The argument required is an `HWND`, a value of type `*mut c_void`. This value can be extracted when you open a window in your program, for example using the `raw_window_handle` in winit.
 
+### Linux backends: D-Bus and `zbus`
+
+When using the library on Linux, the default backend is `dbus-crossroads`. This backend has some issues with consistency in general, but is more stable and uses the native D-Bus library behind the scenes. The zbus backend however, is more modern and is written in pure Rust. It spawns another thread and stars an async `pollster` runtime, handling the incoming MPRIS messages. 
+
+To enable the zbus backend, in your Cargo.toml, set `default-features` to false and enable the `use_zbus` feature:
+
+```toml
+souvlaki = { version = "<version>", default-features = false, features = ["use_zbus"] }
+```
+
+
+**Note:** If you think there's a better way of using the zbus library regarding the async runtime in another thread, feel free to leave a PR or issue.
+
 ## Example
 
 ```rust
