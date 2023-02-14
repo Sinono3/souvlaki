@@ -1,6 +1,6 @@
 #![cfg(target_os = "windows")]
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use windows::core::{Error as WindowsError, HSTRING};
 use windows::Foundation::{EventRegistrationToken, TimeSpan, TypedEventHandler, Uri};
@@ -66,7 +66,7 @@ impl MediaControls {
     /// Attach the media control events to a handler.
     pub fn attach<F>(&mut self, event_handler: F) -> Result<(), Error>
     where
-        F: Fn(MediaControlEvent) + Send + Sync + 'static,
+        F: Fn(MediaControlEvent) + Send + 'static,
     {
         self.controls.SetIsEnabled(true)?;
         self.controls.SetIsPlayEnabled(true)?;
@@ -80,7 +80,7 @@ impl MediaControls {
         // TODO: allow changing this
         self.display_updater.SetType(MediaPlaybackType::Music)?;
 
-        let event_handler = Arc::new(event_handler);
+        let event_handler = Arc::new(Mutex::new(event_handler));
 
         let button_handler = TypedEventHandler::new({
             let event_handler = event_handler.clone();
@@ -109,7 +109,7 @@ impl MediaControls {
                     return Ok(());
                 };
 
-                event_handler(event);
+                (event_handler.lock().unwrap())(event);
                 Ok(())
             }
         });
@@ -120,7 +120,9 @@ impl MediaControls {
                 let args: &PlaybackPositionChangeRequestedEventArgs = args.as_ref().unwrap();
                 let position = Duration::from(args.RequestedPlaybackPosition()?);
 
-                (event_handler)(MediaControlEvent::SetPosition(MediaPosition(position)));
+                (event_handler.lock().unwrap())(MediaControlEvent::SetPosition(MediaPosition(
+                    position,
+                )));
                 Ok(())
             }
         });
