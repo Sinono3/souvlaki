@@ -3,7 +3,7 @@
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use windows::core::{Error as WindowsError, HSTRING};
-use windows::Foundation::{TypedEventHandler, Uri};
+use windows::Foundation::{EventRegistrationToken, TimeSpan, TypedEventHandler, Uri};
 use windows::Media::*;
 use windows::Storage::Streams::RandomAccessStreamReference;
 use windows::Win32::Foundation::HWND;
@@ -16,6 +16,7 @@ use crate::{
 /// A handle to OS media controls.
 pub struct MediaControls {
     controls: SystemMediaTransportControls,
+    button_handler_token: Option<EventRegistrationToken>,
     display_updater: SystemMediaTransportControlsDisplayUpdater,
     timeline_properties: SystemMediaTransportControlsTimelineProperties,
 }
@@ -58,6 +59,7 @@ impl MediaControls {
             controls,
             display_updater,
             timeline_properties,
+            button_handler_token: None,
         })
     }
 
@@ -111,16 +113,16 @@ impl MediaControls {
                 Ok(())
             }
         });
-        self.controls.ButtonPressed(&button_handler)?;
+        self.button_handler_token = Some(self.controls.ButtonPressed(&button_handler)?);
 
         let position_handler = TypedEventHandler::new({
-            let event_handler = event_handler.clone();
-
             move |_, args: &Option<_>| {
                 let args: &PlaybackPositionChangeRequestedEventArgs = args.as_ref().unwrap();
                 let position = Duration::from(args.RequestedPlaybackPosition()?);
 
-                (event_handler.lock().unwrap())(MediaControlEvent::SetPosition(MediaPosition(position)));
+                (event_handler.lock().unwrap())(MediaControlEvent::SetPosition(MediaPosition(
+                    position,
+                )));
                 Ok(())
             }
         });
@@ -133,7 +135,9 @@ impl MediaControls {
     /// Detach the event handler.
     pub fn detach(&mut self) -> Result<(), Error> {
         self.controls.SetIsEnabled(false)?;
-        self.controls.ButtonPressed(None)?;
+        if let Some(button_handler_token) = self.button_handler_token {
+            self.controls.RemoveButtonPressed(button_handler_token)?;
+        }
         Ok(())
     }
 
@@ -153,10 +157,10 @@ impl MediaControls {
             }
             | MediaPlayback::Paused {
                 progress: Some(progress),
-            } => progress.0,
-            _ => Duration::default(),
+            } => TimeSpan::from(progress.0),
+            _ => TimeSpan::default(),
         };
-        self.timeline_properties.SetPosition(progress.into())?;
+        self.timeline_properties.SetPosition(progress)?;
 
         self.controls
             .UpdateTimelineProperties(&self.timeline_properties)?;
@@ -177,17 +181,18 @@ impl MediaControls {
             properties.SetAlbumTitle(&HSTRING::from(album))?;
         }
         if let Some(url) = metadata.cover_url {
-            let uri = Uri::CreateUri(&HSTRING::from(url))?;
-            let stream = RandomAccessStreamReference::CreateFromUri(&uri)?;
+            let stream =
+                RandomAccessStreamReference::CreateFromUri(&Uri::CreateUri(&HSTRING::from(url))?)?;
             self.display_updater.SetThumbnail(&stream)?;
         }
         let duration = metadata.duration.unwrap_or_default();
+        self.timeline_properties.SetStartTime(TimeSpan::default())?;
         self.timeline_properties
-            .SetStartTime(Duration::default().into())?;
+            .SetMinSeekTime(TimeSpan::default())?;
         self.timeline_properties
-            .SetMinSeekTime(Duration::default().into())?;
-        self.timeline_properties.SetEndTime(duration.into())?;
-        self.timeline_properties.SetMaxSeekTime(duration.into())?;
+            .SetEndTime(TimeSpan::from(duration))?;
+        self.timeline_properties
+            .SetMaxSeekTime(TimeSpan::from(duration))?;
 
         self.controls
             .UpdateTimelineProperties(&self.timeline_properties)?;
