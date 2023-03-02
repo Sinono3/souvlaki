@@ -25,10 +25,11 @@ struct ServiceThreadHandle {
     thread: JoinHandle<()>,
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 enum InternalEvent {
     ChangeMetadata(OwnedMetadata),
     ChangePlayback(MediaPlayback),
+    ChangeVolume(f64),
     Kill,
 }
 
@@ -37,6 +38,7 @@ struct ServiceState {
     metadata: OwnedMetadata,
     metadata_dict: HashMap<String, Variant<Box<dyn RefArg>>>,
     playback_status: MediaPlayback,
+    volume: f64,
 }
 
 impl ServiceState {
@@ -175,6 +177,12 @@ impl MediaControls {
         Ok(())
     }
 
+    /// Set the volume level (0.0-1.0) (Only available on MPRIS)
+    pub fn set_volume(&mut self, volume: f64) -> Result<(), Error> {
+        self.send_internal_event(InternalEvent::ChangeVolume(volume));
+        Ok(())
+    }
+
     // TODO: result
     fn send_internal_event(&mut self, event: InternalEvent) {
         let channel = &self.thread.as_ref().unwrap().event_channel;
@@ -246,6 +254,7 @@ where
         metadata: Default::default(),
         metadata_dict: HashMap::new(),
         playback_status: MediaPlayback::Stopped,
+        volume: 1.0,
     };
 
     state.set_metadata(Default::default());
@@ -343,8 +352,20 @@ where
             .emits_changed_true();
 
         b.property("Volume")
-            .get(|_, _| Ok(1.0))
-            .set(|_, _, _| Ok(Some(1.0)))
+            .get({
+                let state = state.clone();
+                move |_, _| {
+                    let state = state.lock().unwrap();
+                    Ok(state.volume)
+                }
+            })
+            .set({
+                let event_handler = event_handler.clone();
+                move |_, _, volume: f64| {
+                    (event_handler.lock().unwrap())(MediaControlEvent::SetVolume(volume));
+                    Ok(Some(volume))
+                }
+            })
             .emits_changed_true();
 
         b.property("Position").get({
@@ -431,6 +452,11 @@ where
                         "PlaybackStatus".to_owned(),
                         Variant(Box::new(state.get_playback_status().to_string())),
                     );
+                }
+                InternalEvent::ChangeVolume(volume) => {
+                    let mut state = state.lock().unwrap();
+                    state.volume = volume;
+                    changed_properties.insert("Volume".to_owned(), Variant(Box::new(volume)));
                 }
                 _ => (),
             }

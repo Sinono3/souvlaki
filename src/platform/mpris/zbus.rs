@@ -29,10 +29,11 @@ struct ServiceThreadHandle {
     thread: JoinHandle<()>,
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 enum InternalEvent {
     ChangeMetadata(OwnedMetadata),
     ChangePlayback(MediaPlayback),
+    ChangeVolume(f64),
     Kill,
 }
 
@@ -40,6 +41,7 @@ enum InternalEvent {
 struct ServiceState {
     metadata: OwnedMetadata,
     playback_status: MediaPlayback,
+    volume: f64,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
@@ -122,6 +124,12 @@ impl MediaControls {
     /// Set the metadata of the currently playing media item.
     pub fn set_metadata(&mut self, metadata: MediaMetadata) -> Result<(), Error> {
         self.send_internal_event(InternalEvent::ChangeMetadata(metadata.into()));
+        Ok(())
+    }
+
+    /// Set the volume level (0.0 - 1.0) (Only available on MPRIS)
+    pub fn set_volume(&mut self, volume: f64) -> Result<(), Error> {
+        self.send_internal_event(InternalEvent::ChangeVolume(volume));
         Ok(())
     }
 
@@ -307,7 +315,12 @@ impl PlayerInterface {
 
     #[dbus_interface(property)]
     fn volume(&self) -> f64 {
-        1.0
+        self.state.volume
+    }
+
+    #[dbus_interface(property)]
+    fn set_volume(&self, volume: f64) {
+        self.send_event(MediaControlEvent::SetVolume(volume));
     }
 
     #[dbus_interface(property)]
@@ -381,6 +394,7 @@ async fn run_service(
         state: ServiceState {
             metadata: OwnedMetadata::default(),
             playback_status: MediaPlayback::Stopped,
+            volume: 1.0,
         },
         event_handler,
     };
@@ -416,7 +430,11 @@ async fn run_service(
                     interface.state.playback_status = playback;
                     interface.playback_status_changed(&ctxt).await?;
                 }
-                _ => (),
+                InternalEvent::ChangeVolume(volume) => {
+                    interface.state.volume = volume;
+                    interface.volume_changed(&ctxt).await?;
+                }
+                InternalEvent::Kill => (),
             }
         }
     }
