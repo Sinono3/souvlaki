@@ -181,8 +181,17 @@ impl MediaControls {
             properties.SetAlbumTitle(&HSTRING::from(album))?;
         }
         if let Some(url) = metadata.cover_url {
-            let stream =
-                RandomAccessStreamReference::CreateFromUri(&Uri::CreateUri(&HSTRING::from(url))?)?;
+            let stream = if url.starts_with("file://") {
+                // url is a file, load it manually
+                let path = url.trim_start_matches("file://");
+                let loader = windows::Storage::StorageFile::GetFileFromPathAsync(&HSTRING::from(path))?;
+                let results = loader.get()?;
+                loader.Close()?;
+
+                RandomAccessStreamReference::CreateFromFile(&results)?
+            } else {
+                RandomAccessStreamReference::CreateFromUri(&Uri::CreateUri(&HSTRING::from(url))?)?
+            };
             self.display_updater.SetThumbnail(&stream)?;
         }
         let duration = metadata.duration.unwrap_or_default();
