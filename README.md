@@ -26,7 +26,7 @@ A cross-platform library for handling OS media controls and metadata. One abstra
 ```shell
 # In one shell
 $ cd souvlaki 
-$ cargo run --example example
+$ cargo run --example window
 
 # In another shell
 $ playerctl metadata
