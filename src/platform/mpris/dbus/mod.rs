@@ -1,5 +1,11 @@
 mod interfaces;
 
+use dbus::arg::{RefArg, Variant};
+use dbus::blocking::Connection;
+use dbus::channel::{MatchingReceiver, Sender};
+use dbus::ffidisp::stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged;
+use dbus::message::SignalArgs;
+use dbus::Path;
 use std::collections::HashMap;
 use std::convert::From;
 use std::convert::TryInto;
@@ -10,7 +16,19 @@ use std::time::Duration;
 use crate::{MediaControlEvent, MediaMetadata, MediaPlayback, PlatformConfig};
 
 /// A platform-specific error.
-pub type Error = dbus::Error;
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("internal D-Bus error: {0}")]
+    DbusError(#[from] dbus::Error),
+    #[error("D-bus service thread not running. Run MediaControls::attach()")]
+    ThreadNotRunning,
+    // NOTE: For now this error is not very descriptive. For now we can't do much about it
+    // since the panic message returned by JoinHandle::join does not implement Debug/Display,
+    // thus we cannot print it, though perhaps there is another way. I will leave this error here,
+    // to at least be able to catch it, but it is preferable to have this thread *not panic* at all.
+    #[error("D-Bus service thread panicked")]
+    ThreadPanicked,
+}
 
 /// A handle to OS media controls.
 pub struct MediaControls {
@@ -21,7 +39,7 @@ pub struct MediaControls {
 
 struct ServiceThreadHandle {
     event_channel: mpsc::Sender<InternalEvent>,
-    thread: JoinHandle<()>,
+    thread: JoinHandle<Result<(), Error>>,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -144,14 +162,18 @@ impl MediaControls {
         let friendly_name = self.friendly_name.clone();
         let (event_channel, rx) = mpsc::channel();
 
+        // Check if the connection can be created BEFORE spawning the new thread
+        let conn = Connection::new_session()?;
+        let name = format!("org.mpris.MediaPlayer2.{}", dbus_name);
+        conn.request_name(name, false, true, false)?;
+
         self.thread = Some(ServiceThreadHandle {
             event_channel,
-            thread: thread::spawn(move || {
-                run_service(dbus_name, friendly_name, event_handler, rx).unwrap()
-            }),
+            thread: thread::spawn(move || run_service(conn, friendly_name, event_handler, rx)),
         });
         Ok(())
     }
+
     /// Detach the event handler.
     pub fn detach(&mut self) -> Result<(), Error> {
         if let Some(ServiceThreadHandle {
@@ -159,57 +181,49 @@ impl MediaControls {
             thread,
         }) = self.thread.take()
         {
-            event_channel.send(InternalEvent::Kill).unwrap();
-            thread.join().unwrap();
+            // We don't care about the result of this event, since we immedieately
+            // check if the thread has panicked on the next line.
+            event_channel.send(InternalEvent::Kill).ok();
+            // One error in case the thread panics, and the other one in case the
+            // thread has returned an error.
+            thread.join().map_err(|_| Error::ThreadPanicked)??;
         }
         Ok(())
     }
 
     /// Set the current playback status.
     pub fn set_playback(&mut self, playback: MediaPlayback) -> Result<(), Error> {
-        self.send_internal_event(InternalEvent::ChangePlayback(playback));
-        Ok(())
+        self.send_internal_event(InternalEvent::ChangePlayback(playback))
     }
 
     /// Set the metadata of the currently playing media item.
     pub fn set_metadata(&mut self, metadata: MediaMetadata) -> Result<(), Error> {
-        self.send_internal_event(InternalEvent::ChangeMetadata(metadata.into()));
-        Ok(())
+        self.send_internal_event(InternalEvent::ChangeMetadata(metadata.into()))
     }
 
     /// Set the volume level (0.0-1.0) (Only available on MPRIS)
     pub fn set_volume(&mut self, volume: f64) -> Result<(), Error> {
-        self.send_internal_event(InternalEvent::ChangeVolume(volume));
-        Ok(())
+        self.send_internal_event(InternalEvent::ChangeVolume(volume))
     }
 
-    // TODO: result
-    fn send_internal_event(&mut self, event: InternalEvent) {
-        let channel = &self.thread.as_ref().unwrap().event_channel;
-        channel.send(event).unwrap();
+    fn send_internal_event(&mut self, event: InternalEvent) -> Result<(), Error> {
+        let thread = &self.thread.as_ref().ok_or(Error::ThreadNotRunning)?;
+        thread
+            .event_channel
+            .send(event)
+            .map_err(|_| Error::ThreadPanicked)
     }
 }
 
-use dbus::arg::{RefArg, Variant};
-use dbus::blocking::Connection;
-use dbus::channel::{MatchingReceiver, Sender};
-use dbus::ffidisp::stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged;
-use dbus::message::SignalArgs;
-use dbus::Path;
-
 fn run_service<F>(
-    dbus_name: String,
+    conn: Connection,
     friendly_name: String,
     event_handler: F,
     event_channel: mpsc::Receiver<InternalEvent>,
-) -> Result<(), dbus::Error>
+) -> Result<(), Error>
 where
     F: Fn(MediaControlEvent) + Send + 'static,
 {
-    let c = Connection::new_session()?;
-    let name = format!("org.mpris.MediaPlayer2.{}", dbus_name);
-    c.request_name(name, false, true, false)?;
-
     let state = Arc::new(Mutex::new(ServiceState {
         metadata: Default::default(),
         metadata_dict: create_metadata_dict(&Default::default()),
@@ -221,7 +235,7 @@ where
 
     let mut cr = interfaces::register_methods(&state, &event_handler, friendly_name, seeked_signal);
 
-    c.start_receive(
+    conn.start_receive(
         dbus::message::MatchRule::new_method_call(),
         Box::new(move |msg, conn| {
             cr.handle_message(msg, conn).unwrap();
@@ -268,12 +282,12 @@ where
                 invalidated_properties: Vec::new(),
             };
 
-            c.send(
+            conn.send(
                 properties_changed.to_emit_message(&Path::new("/org/mpris/MediaPlayer2").unwrap()),
             )
             .ok();
         }
-        c.process(Duration::from_millis(1000))?;
+        conn.process(Duration::from_millis(1000))?;
     }
 
     Ok(())
