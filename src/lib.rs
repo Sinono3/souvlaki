@@ -27,7 +27,7 @@ pub struct MediaMetadata<'a> {
 }
 
 /// Events sent by the OS media controls.
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum MediaControlEvent {
     Play,
     Pause,
@@ -42,6 +42,8 @@ pub enum MediaControlEvent {
     SeekBy(SeekDirection, Duration),
     /// Set the position/progress of the currently playing media item.
     SetPosition(MediaPosition),
+    /// Sets the volume from 0.0 to 1.0.
+    SetVolume(f64),
     /// Open the URI in the media player.
     OpenUri(String),
 
