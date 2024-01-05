@@ -3,7 +3,7 @@
 mod config;
 mod platform;
 
-use std::time::Duration;
+use std::{fmt::Debug, time::Duration};
 
 pub use config::*;
 pub use platform::{Error, MediaControls};
@@ -68,5 +68,12 @@ impl Drop for MediaControls {
     fn drop(&mut self) {
         // Ignores errors if there are any.
         self.detach().ok();
+    }
+}
+
+impl Debug for MediaControls {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("MediaControls")?;
+        Ok(())
     }
 }
