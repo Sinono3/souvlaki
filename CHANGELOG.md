@@ -16,6 +16,12 @@ Types of changes:
 
 ## [Unreleased]
 
+## [0.7.2]
+
+### Changed
+
+- Bumped MSRV to 1.67
+
 ## [0.7.1]
 
 ### Added
