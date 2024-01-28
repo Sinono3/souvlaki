@@ -45,6 +45,10 @@ my_player xesam:title               When The Sun Hits
 - Now Playing:\
 ![Now Playing](https://user-images.githubusercontent.com/434125/171526759-9232be58-63ed-4eea-ac15-aa50258d8254.png)
 
+## Requirements
+
+Minimum supported Rust version is 1.60.0.
+
 ## Usage
 
 The main struct is `MediaControls`. In order to create this struct you need a `PlatformConfig`. This struct contains all of the platform-specific requirements for spawning media controls. Here are the differences between the platforms:

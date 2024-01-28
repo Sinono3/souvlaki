@@ -9,7 +9,7 @@ use dbus_crossroads::{Crossroads, IfaceBuilder};
 
 use crate::{MediaControlEvent, MediaPlayback, MediaPosition, SeekDirection};
 
-use super::{create_metadata_dict, ServiceState};
+use super::controls::{create_metadata_dict, ServiceState};
 
 // TODO: This type is super messed up, but it's the only way to get seeking working properly
 // on graphical media controls using dbus-crossroads.
