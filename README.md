@@ -47,7 +47,7 @@ my_player xesam:title               When The Sun Hits
 
 ## Requirements
 
-Minimum supported Rust version is 1.60.0.
+Minimum supported Rust version is 1.65.0.
 
 ## Usage
 

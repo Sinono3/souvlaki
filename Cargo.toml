@@ -7,7 +7,7 @@ description = "A cross-platform media key and metadata handling library."
 repository = "https://github.com/Sinono3/souvlaki"
 documentation = "https://docs.rs/souvlaki"
 license = "MIT"
-rust-version = "1.60"
+rust-version = "1.65"
 
 [target.'cfg(target_os = "windows")'.dependencies.windows]
 version = "0.44"
