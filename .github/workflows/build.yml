@@ -1,11 +1,6 @@
 name: CI
 
-on:
-  push:
-    branches: 
-      - "**"
-  pull_request:
-    branches: [ master ]
+on: [push, pull_request]
 
 env:
   CARGO_TERM_COLOR: always
@@ -20,12 +15,9 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-    - uses: Swatinem/rust-cache@v1
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@1.60.0
+    - uses: Swatinem/rust-cache@v2
     - name: Install Dependencies
       run: |
         sudo apt-get update
