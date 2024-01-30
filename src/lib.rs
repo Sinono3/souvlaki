@@ -42,7 +42,12 @@ pub enum MediaControlEvent {
     SeekBy(SeekDirection, Duration),
     /// Set the position/progress of the currently playing media item.
     SetPosition(MediaPosition),
-    /// Sets the volume from 0.0 to 1.0.
+    /// Sets the volume. The value is intended to be from 0.0 to 1.0.
+    /// But other values are also accepted. **It is up to the user to
+    /// set constraints on this value.**
+    /// **NOTE**: If the volume event was received and correctly handled,
+    /// the user must call [`MediaControls::set_volume`]. Note that 
+    /// this must be done only with the MPRIS backend.
     SetVolume(f64),
     /// Open the URI in the media player.
     OpenUri(String),
