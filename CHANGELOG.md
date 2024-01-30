@@ -16,6 +16,8 @@ Types of changes:
 
 ## [Unreleased]
 
+## [0.7.3]
+
 ### Added
 
 - Documentation for `MediaControlEvent::SetVolume` #47
