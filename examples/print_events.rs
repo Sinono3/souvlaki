@@ -53,8 +53,7 @@ mod windows {
     use std::io::Error;
     use std::mem;
 
-    use windows::core::PCWSTR;
-    use windows::w;
+    use windows::core::{w, PCWSTR};
     use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
     use windows::Win32::System::LibraryLoader::GetModuleHandleW;
     use windows::Win32::UI::WindowsAndMessaging::{
@@ -77,7 +76,7 @@ mod windows {
 
                 let wnd_class = WNDCLASSEXW {
                     cbSize: mem::size_of::<WNDCLASSEXW>() as u32,
-                    hInstance: instance,
+                    hInstance: instance.into(),
                     lpszClassName: PCWSTR::from(class_name),
                     lpfnWndProc: Some(Self::wnd_proc),
                     ..Default::default()
