@@ -13,20 +13,7 @@ use crate::{
     MediaControlEvent, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig, SeekDirection,
 };
 
-/// A platform-specific error.
-#[derive(thiserror::Error, Debug)]
-pub enum Error {
-    #[error("internal D-Bus error: {0}")]
-    DbusError(#[from] zbus::Error),
-    #[error("D-bus service thread not running. Run MediaControls::attach()")]
-    ThreadNotRunning,
-    // NOTE: For now this error is not very descriptive. For now we can't do much about it
-    // since the panic message returned by JoinHandle::join does not implement Debug/Display,
-    // thus we cannot print it, though perhaps there is another way. I will leave this error here,
-    // to at least be able to catch it, but it is preferable to have this thread *not panic* at all.
-    #[error("D-Bus service thread panicked")]
-    ThreadPanicked,
-}
+use super::Error;
 
 /// A handle to OS media controls.
 pub struct MediaControls {
@@ -144,9 +131,8 @@ impl MediaControls {
         Ok(())
     }
 
-    // TODO: result
     fn send_internal_event(&mut self, event: InternalEvent) -> Result<(), Error> {
-        let channel = &self.thread.as_ref().unwrap().event_channel;
+        let channel = &self.thread.as_ref().ok_or(Error::ThreadNotRunning)?.event_channel;
         channel.send(event).map_err(|_| Error::ThreadPanicked)
     }
 }
