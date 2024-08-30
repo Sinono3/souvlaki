@@ -14,8 +14,19 @@ use crate::{
 };
 
 /// A platform-specific error.
-#[derive(Debug)]
-pub struct Error;
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("internal D-Bus error: {0}")]
+    DbusError(#[from] zbus::Error),
+    #[error("D-bus service thread not running. Run MediaControls::attach()")]
+    ThreadNotRunning,
+    // NOTE: For now this error is not very descriptive. For now we can't do much about it
+    // since the panic message returned by JoinHandle::join does not implement Debug/Display,
+    // thus we cannot print it, though perhaps there is another way. I will leave this error here,
+    // to at least be able to catch it, but it is preferable to have this thread *not panic* at all.
+    #[error("D-Bus service thread panicked")]
+    ThreadPanicked,
+}
 
 /// A handle to OS media controls.
 pub struct MediaControls {
@@ -109,34 +120,34 @@ impl MediaControls {
             thread,
         }) = self.thread.take()
         {
-            event_channel.send(InternalEvent::Kill).unwrap();
-            thread.join().unwrap();
+            event_channel.send(InternalEvent::Kill).ok();
+            thread.join().map_err(|_| Error::ThreadPanicked)?;
         }
         Ok(())
     }
 
     /// Set the current playback status.
     pub fn set_playback(&mut self, playback: MediaPlayback) -> Result<(), Error> {
-        self.send_internal_event(InternalEvent::ChangePlayback(playback));
+        self.send_internal_event(InternalEvent::ChangePlayback(playback))?;
         Ok(())
     }
 
     /// Set the metadata of the currently playing media item.
     pub fn set_metadata(&mut self, metadata: MediaMetadata) -> Result<(), Error> {
-        self.send_internal_event(InternalEvent::ChangeMetadata(metadata.into()));
+        self.send_internal_event(InternalEvent::ChangeMetadata(metadata.into()))?;
         Ok(())
     }
 
     /// Set the volume level (0.0 - 1.0) (Only available on MPRIS)
     pub fn set_volume(&mut self, volume: f64) -> Result<(), Error> {
-        self.send_internal_event(InternalEvent::ChangeVolume(volume));
+        self.send_internal_event(InternalEvent::ChangeVolume(volume))?;
         Ok(())
     }
 
     // TODO: result
-    fn send_internal_event(&mut self, event: InternalEvent) {
+    fn send_internal_event(&mut self, event: InternalEvent) -> Result<(), Error> {
         let channel = &self.thread.as_ref().unwrap().event_channel;
-        channel.send(event).unwrap();
+        channel.send(event).map_err(|_| Error::ThreadPanicked)
     }
 }
 
