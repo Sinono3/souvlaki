@@ -13,9 +13,7 @@ use crate::{
     MediaControlEvent, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig, SeekDirection,
 };
 
-/// A platform-specific error.
-#[derive(Debug)]
-pub struct Error;
+use super::Error;
 
 /// A handle to OS media controls.
 pub struct MediaControls {
@@ -109,34 +107,33 @@ impl MediaControls {
             thread,
         }) = self.thread.take()
         {
-            event_channel.send(InternalEvent::Kill).unwrap();
-            thread.join().unwrap();
+            event_channel.send(InternalEvent::Kill).ok();
+            thread.join().map_err(|_| Error::ThreadPanicked)?;
         }
         Ok(())
     }
 
     /// Set the current playback status.
     pub fn set_playback(&mut self, playback: MediaPlayback) -> Result<(), Error> {
-        self.send_internal_event(InternalEvent::ChangePlayback(playback));
+        self.send_internal_event(InternalEvent::ChangePlayback(playback))?;
         Ok(())
     }
 
     /// Set the metadata of the currently playing media item.
     pub fn set_metadata(&mut self, metadata: MediaMetadata) -> Result<(), Error> {
-        self.send_internal_event(InternalEvent::ChangeMetadata(metadata.into()));
+        self.send_internal_event(InternalEvent::ChangeMetadata(metadata.into()))?;
         Ok(())
     }
 
     /// Set the volume level (0.0 - 1.0) (Only available on MPRIS)
     pub fn set_volume(&mut self, volume: f64) -> Result<(), Error> {
-        self.send_internal_event(InternalEvent::ChangeVolume(volume));
+        self.send_internal_event(InternalEvent::ChangeVolume(volume))?;
         Ok(())
     }
 
-    // TODO: result
-    fn send_internal_event(&mut self, event: InternalEvent) {
-        let channel = &self.thread.as_ref().unwrap().event_channel;
-        channel.send(event).unwrap();
+    fn send_internal_event(&mut self, event: InternalEvent) -> Result<(), Error> {
+        let channel = &self.thread.as_ref().ok_or(Error::ThreadNotRunning)?.event_channel;
+        channel.send(event).map_err(|_| Error::ThreadPanicked)
     }
 }
 

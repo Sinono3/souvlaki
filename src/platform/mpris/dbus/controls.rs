@@ -12,21 +12,7 @@ use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 use crate::{MediaControlEvent, MediaMetadata, MediaPlayback, PlatformConfig};
-
-/// A platform-specific error.
-#[derive(thiserror::Error, Debug)]
-pub enum Error {
-    #[error("internal D-Bus error: {0}")]
-    DbusError(#[from] dbus::Error),
-    #[error("D-bus service thread not running. Run MediaControls::attach()")]
-    ThreadNotRunning,
-    // NOTE: For now this error is not very descriptive. For now we can't do much about it
-    // since the panic message returned by JoinHandle::join does not implement Debug/Display,
-    // thus we cannot print it, though perhaps there is another way. I will leave this error here,
-    // to at least be able to catch it, but it is preferable to have this thread *not panic* at all.
-    #[error("D-Bus service thread panicked")]
-    ThreadPanicked,
-}
+use super::super::Error;
 
 /// A handle to OS media controls.
 pub struct MediaControls {

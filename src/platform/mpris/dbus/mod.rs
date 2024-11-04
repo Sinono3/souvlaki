@@ -1,4 +1,4 @@
 mod interfaces;
 
 mod controls;
-pub use controls::{Error, MediaControls};
+pub use controls::MediaControls;
