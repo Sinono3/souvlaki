@@ -1,3 +1,4 @@
+#![allow(clippy::module_inception)]
 pub use self::platform::*;
 
 #[cfg(target_os = "windows")]
