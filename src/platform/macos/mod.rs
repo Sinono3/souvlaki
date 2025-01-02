@@ -1,7 +1,8 @@
-#![cfg(target_os = "macos")]
+#![cfg(any(target_os = "macos", target_os = "ios"))]
 #![allow(non_upper_case_globals)]
 
 use std::{
+    fs,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
@@ -12,13 +13,14 @@ use std::{
 use block::ConcreteBlock;
 use cocoa::{
     base::{id, nil, NO, YES},
-    foundation::{NSInteger, NSSize, NSString, NSUInteger},
+    foundation::{NSInteger, NSString, NSUInteger},
 };
 use core_graphics::geometry::CGSize;
+
 use dispatch::{Queue, QueuePriority};
 use objc::{class, msg_send, sel, sel_impl};
 
-use crate::{MediaControlEvent, MediaMetadata, MediaPlayback, PlatformConfig, MediaPosition};
+use crate::{MediaControlEvent, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig};
 
 /// A platform-specific error.
 #[derive(Debug)]
@@ -122,14 +124,14 @@ unsafe fn set_playback_metadata(metadata: MediaMetadata) {
     if let Some(cover_url) = metadata.cover_url {
         let cover_url = cover_url.to_owned();
         Queue::global(QueuePriority::Default).exec_async(move || {
-            load_and_set_playback_artwork(ns_url(&cover_url), prev_counter + 1);
+            load_and_set_playback_artwork(cover_url, prev_counter + 1);
         });
     }
     let _: () = msg_send!(media_center, setNowPlayingInfo: now_playing);
 }
 
-unsafe fn load_and_set_playback_artwork(url: id, for_counter: usize) {
-    let (image, size) = ns_image_from_url(url);
+unsafe fn load_and_set_playback_artwork(url: String, for_counter: usize) {
+    let (image, size) = load_image_from_url(&url);
     let artwork = mp_artwork(image, size);
     if GLOBAL_METADATA_COUNTER.load(Ordering::SeqCst) == for_counter {
         set_playback_artwork(artwork);
@@ -229,8 +231,14 @@ unsafe fn attach_command_handlers(handler: Arc<dyn Fn(MediaControlEvent)>) {
         let handler = handler.clone();
         // event of type MPChangePlaybackPositionCommandEvent
         move |event: id| -> NSInteger {
-            let position = event.as_ref().unwrap().get_ivar::<f64>("_positionTime").clone();
-            (handler)(MediaControlEvent::SetPosition(MediaPosition(Duration::from_secs_f64(position))));
+            let position = event
+                .as_ref()
+                .unwrap()
+                .get_ivar::<f64>("_positionTime")
+                .clone();
+            (handler)(MediaControlEvent::SetPosition(MediaPosition(
+                Duration::from_secs_f64(position),
+            )));
             MPRemoteCommandHandlerStatusSuccess
         }
     })
@@ -282,13 +290,43 @@ unsafe fn ns_url(value: &str) -> id {
     url
 }
 
-unsafe fn ns_image_from_url(url: id) -> (id, CGSize) {
+#[cfg(target_os = "ios")]
+unsafe fn load_image_from_url(url: &str) -> (id, CGSize) {
+    let image_data = fs::read(&url).unwrap();
+    let base64_data = base64::encode(image_data);
+    let base64_ns_string = ns_string(&base64_data);
+
+    let ns_data: id = msg_send!(class!(NSData), alloc);
+    let ns_data: id = msg_send!(ns_data, initWithBase64EncodedString: base64_ns_string
+                                          options: 0);
+    if ns_data == nil {
+        return (nil, CGSize::new(0.0, 0.0));
+    }
+    let image: id = msg_send!(class!(UIImage), imageWithData: ns_data);
+    if image == nil {
+        return (nil, CGSize::new(0.0, 0.0));
+    }
+    let size: CGSize = msg_send!(image, size);
+    (image, size)
+}
+
+#[cfg(target_os = "macos")]
+unsafe fn load_image_from_url(url: &str) -> (id, CGSize) {
+    let url = ns_url(url);
     let image: id = msg_send!(class!(NSImage), alloc);
     let image: id = msg_send!(image, initWithContentsOfURL: url);
-    let size: NSSize = msg_send!(image, size);
+    let size: CGSize = msg_send!(image, size);
     (image, CGSize::new(size.width, size.height))
 }
 
+#[cfg(target_os = "ios")]
+unsafe fn mp_artwork(image: id, bounds: CGSize) -> id {
+    let artwork: id = msg_send!(class!(MPMediaItemArtwork), alloc);
+    let artwork: id = msg_send!(artwork, initWithImage: image);
+    artwork
+}
+
+#[cfg(target_os = "macos")]
 unsafe fn mp_artwork(image: id, bounds: CGSize) -> id {
     let handler = ConcreteBlock::new(move |_size: CGSize| -> id { image }).copy();
     let artwork: id = msg_send!(class!(MPMediaItemArtwork), alloc);
