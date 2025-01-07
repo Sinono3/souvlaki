@@ -2,7 +2,6 @@
 #![allow(non_upper_case_globals)]
 
 use std::{
-    fs,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
