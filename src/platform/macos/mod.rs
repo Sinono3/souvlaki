@@ -230,11 +230,10 @@ unsafe fn attach_command_handlers(handler: Arc<dyn Fn(MediaControlEvent)>) {
         let handler = handler.clone();
         // event of type MPChangePlaybackPositionCommandEvent
         move |event: id| -> NSInteger {
-            let position = event
+            let position = *event
                 .as_ref()
                 .unwrap()
-                .get_ivar::<f64>("_positionTime")
-                .clone();
+                .get_ivar::<f64>("_positionTime");
             (handler)(MediaControlEvent::SetPosition(MediaPosition(
                 Duration::from_secs_f64(position),
             )));
