@@ -16,6 +16,17 @@ Types of changes:
 
 ## [Unreleased]
 
+## [0.8.0]
+
+### Added
+
+- iOS support (#55 Thank you @XMLHexagram !)
+- Error handling for zbus, and unify dbus/zbus Error type (#52 Thank you @taoky !)
+
+### Fixed
+
+- Clippy lints (#51 Thank you @LucasFA !)
+
 ## [0.7.3]
 
 ### Added

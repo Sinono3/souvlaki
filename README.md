@@ -2,12 +2,12 @@
 
 # Souvlaki [![Crates.io](https://img.shields.io/crates/v/souvlaki.svg)](https://crates.io/crates/souvlaki) [![Docs](https://docs.rs/souvlaki/badge.svg)](https://docs.rs/souvlaki) [![CI](https://github.com/Sinono3/souvlaki/actions/workflows/build.yml/badge.svg)](https://github.com/Sinono3/souvlaki/actions/workflows/build.yml)
 
-A cross-platform library for handling OS media controls and metadata. One abstraction for Linux, MacOS and Windows.
+A cross-platform library for handling OS media controls and metadata. One abstraction for Linux, MacOS/iOS, Windows.
 
 ## Supported platforms
 
 - Linux (via MPRIS)
-- MacOS
+- MacOS/iOS
 - Windows
 
 ## Windows
@@ -54,6 +54,7 @@ Minimum supported Rust version is 1.67.
 The main struct is `MediaControls`. In order to create this struct you need a `PlatformConfig`. This struct contains all of the platform-specific requirements for spawning media controls. Here are the differences between the platforms:
 
 - MacOS: No config needed, but requires a window to be open ([#23](https://github.com/Sinono3/souvlaki/issues/23))
+- iOS: No config needed.
 - Linux: 
 	- `dbus_name`: The way your player will appear on D-Bus. It should follow [the D-Bus specification](https://dbus.freedesktop.org/doc/dbus-specification.html#message-protocol-names-bus). 
 	- `display_name`: This could be however you want. It's the name that will be shown to the users.
