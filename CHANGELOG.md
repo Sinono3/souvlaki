@@ -16,6 +16,10 @@ Types of changes:
 
 ## [Unreleased]
 
+### Fixed
+
+- Android platform module error
+
 ## [0.8.0]
 
 ### Added
