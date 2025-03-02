@@ -19,6 +19,7 @@ Types of changes:
 ### Fixed
 
 - Android platform module error
+- Linux CI failing due to missing dependency
 
 ## [0.8.0]
 
