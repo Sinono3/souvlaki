@@ -1,7 +1,7 @@
 [package]
 name = "souvlaki"
-version = "0.8.0"
-authors = ["Sinono3 <aldo@aael.xyz>"]
+version = "0.8.1"
+authors = ["Sinono3 <aldoacevedo@protonmail.com>"]
 edition = "2018"
 description = "A cross-platform media key and metadata handling library."
 repository = "https://github.com/Sinono3/souvlaki"

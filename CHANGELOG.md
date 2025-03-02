@@ -16,6 +16,8 @@ Types of changes:
 
 ## [Unreleased]
 
+## [0.8.1]
+
 ### Fixed
 
 - Android platform module error
