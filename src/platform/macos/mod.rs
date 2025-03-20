@@ -1,9 +1,6 @@
 #![cfg(any(target_os = "macos", target_os = "ios"))]
 #![allow(non_upper_case_globals)]
 
-#[cfg(target_os = "ios")]
-use std::fs;
-
 use std::{
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -233,10 +230,7 @@ unsafe fn attach_command_handlers(handler: Arc<dyn Fn(MediaControlEvent)>) {
         let handler = handler.clone();
         // event of type MPChangePlaybackPositionCommandEvent
         move |event: id| -> NSInteger {
-            let position = *event
-                .as_ref()
-                .unwrap()
-                .get_ivar::<f64>("_positionTime");
+            let position = *event.as_ref().unwrap().get_ivar::<f64>("_positionTime");
             (handler)(MediaControlEvent::SetPosition(MediaPosition(
                 Duration::from_secs_f64(position),
             )));
@@ -293,12 +287,10 @@ unsafe fn ns_url(value: &str) -> id {
 
 #[cfg(target_os = "ios")]
 unsafe fn load_image_from_url(url: &str) -> (id, CGSize) {
-    let image_data = fs::read(&url).unwrap();
-    let base64_data = base64::encode(image_data);
-    let base64_ns_string = ns_string(&base64_data);
+    let ns_url: id = msg_send!(class!(NSURL), URLWithString: url);
 
     let ns_data: id = msg_send!(class!(NSData), alloc);
-    let ns_data: id = msg_send!(ns_data, initWithBase64EncodedString: base64_ns_string
+    let ns_data: id = msg_send!(ns_data, dataWithContentsOfURL: ns_url
                                           options: 0);
     if ns_data == nil {
         return (nil, CGSize::new(0.0, 0.0));
