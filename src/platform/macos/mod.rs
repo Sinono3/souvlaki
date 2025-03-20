@@ -289,7 +289,7 @@ unsafe fn ns_url(value: &str) -> id {
 unsafe fn load_image_from_url(url: &str) -> (id, CGSize) {
     let url = ns_url(url);
     let ns_data: id = msg_send!(class!(NSData), alloc);
-    let ns_data: id = msg_send!(ns_data, dataWithContentsOfURL: url
+    let ns_data: id = msg_send!(ns_data, contentsOf: url
                                           options: 0);
     if ns_data == nil {
         return (nil, CGSize::new(0.0, 0.0));
