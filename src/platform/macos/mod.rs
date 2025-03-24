@@ -9,6 +9,7 @@ use std::{
     time::Duration,
 };
 
+use std::fs;
 use block::ConcreteBlock;
 use cocoa::{
     base::{id, nil, NO, YES},
@@ -287,14 +288,14 @@ unsafe fn ns_url(value: &str) -> id {
 
 #[cfg(target_os = "ios")]
 unsafe fn load_image_from_url(url: &str) -> (id, CGSize) {
-    let url = ns_url(url);
-    let ns_data: id = msg_send!(class!(NSData), alloc);
-    let ns_data: id = msg_send!(ns_data, contentsOf: url
-                                          options: 0);
-    if ns_data == nil {
+    let path = url.trim_start_matches("file://");
+
+    let file_exists = fs::metadata(path).is_ok();
+    if !file_exists {
         return (nil, CGSize::new(0.0, 0.0));
     }
-    let image: id = msg_send!(class!(UIImage), imageWithData: ns_data);
+
+    let image: id = msg_send!(class!(UIImage), imageWithContentsOfFile: ns_string(path));
     if image == nil {
         return (nil, CGSize::new(0.0, 0.0));
     }
@@ -304,6 +305,13 @@ unsafe fn load_image_from_url(url: &str) -> (id, CGSize) {
 
 #[cfg(target_os = "macos")]
 unsafe fn load_image_from_url(url: &str) -> (id, CGSize) {
+    let path = url.trim_start_matches("file://");
+
+    let file_exists = fs::metadata(path).is_ok();
+    if !file_exists {
+        return (nil, CGSize::new(0.0, 0.0));
+    }
+
     let url = ns_url(url);
     let image: id = msg_send!(class!(NSImage), alloc);
     let image: id = msg_send!(image, initWithContentsOfURL: url);
