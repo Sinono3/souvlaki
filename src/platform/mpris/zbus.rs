@@ -132,7 +132,11 @@ impl MediaControls {
     }
 
     fn send_internal_event(&mut self, event: InternalEvent) -> Result<(), Error> {
-        let channel = &self.thread.as_ref().ok_or(Error::ThreadNotRunning)?.event_channel;
+        let channel = &self
+            .thread
+            .as_ref()
+            .ok_or(Error::ThreadNotRunning)?
+            .event_channel;
         channel.send(event).map_err(|_| Error::ThreadPanicked)
     }
 }
