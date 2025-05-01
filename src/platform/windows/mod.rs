@@ -184,7 +184,8 @@ impl MediaControls {
             let stream = if url.starts_with("file://") {
                 // url is a file, load it manually
                 let path = url.trim_start_matches("file://");
-                let loader = windows::Storage::StorageFile::GetFileFromPathAsync(&HSTRING::from(path))?;
+                let loader =
+                    windows::Storage::StorageFile::GetFileFromPathAsync(&HSTRING::from(path))?;
                 let results = loader.get()?;
                 loader.Close()?;
 

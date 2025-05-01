@@ -1,9 +1,6 @@
 #![cfg(any(target_os = "macos", target_os = "ios"))]
 #![allow(non_upper_case_globals)]
 
-#[cfg(target_os = "ios")]
-use std::fs;
-
 use std::{
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -12,6 +9,7 @@ use std::{
     time::Duration,
 };
 
+use std::fs;
 use block::ConcreteBlock;
 use cocoa::{
     base::{id, nil, NO, YES},
@@ -233,10 +231,7 @@ unsafe fn attach_command_handlers(handler: Arc<dyn Fn(MediaControlEvent)>) {
         let handler = handler.clone();
         // event of type MPChangePlaybackPositionCommandEvent
         move |event: id| -> NSInteger {
-            let position = *event
-                .as_ref()
-                .unwrap()
-                .get_ivar::<f64>("_positionTime");
+            let position = *event.as_ref().unwrap().get_ivar::<f64>("_positionTime");
             (handler)(MediaControlEvent::SetPosition(MediaPosition(
                 Duration::from_secs_f64(position),
             )));
@@ -293,17 +288,14 @@ unsafe fn ns_url(value: &str) -> id {
 
 #[cfg(target_os = "ios")]
 unsafe fn load_image_from_url(url: &str) -> (id, CGSize) {
-    let image_data = fs::read(&url).unwrap();
-    let base64_data = base64::encode(image_data);
-    let base64_ns_string = ns_string(&base64_data);
+    let path = url.trim_start_matches("file://");
 
-    let ns_data: id = msg_send!(class!(NSData), alloc);
-    let ns_data: id = msg_send!(ns_data, initWithBase64EncodedString: base64_ns_string
-                                          options: 0);
-    if ns_data == nil {
+    let file_exists = fs::metadata(path).is_ok();
+    if !file_exists {
         return (nil, CGSize::new(0.0, 0.0));
     }
-    let image: id = msg_send!(class!(UIImage), imageWithData: ns_data);
+
+    let image: id = msg_send!(class!(UIImage), imageWithContentsOfFile: ns_string(path));
     if image == nil {
         return (nil, CGSize::new(0.0, 0.0));
     }
@@ -313,6 +305,13 @@ unsafe fn load_image_from_url(url: &str) -> (id, CGSize) {
 
 #[cfg(target_os = "macos")]
 unsafe fn load_image_from_url(url: &str) -> (id, CGSize) {
+    let path = url.trim_start_matches("file://");
+
+    let file_exists = fs::metadata(path).is_ok();
+    if !file_exists {
+        return (nil, CGSize::new(0.0, 0.0));
+    }
+
     let url = ns_url(url);
     let image: id = msg_send!(class!(NSImage), alloc);
     let image: id = msg_send!(image, initWithContentsOfURL: url);
