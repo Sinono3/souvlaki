@@ -53,7 +53,7 @@ Minimum supported Rust version is 1.67.
 
 The main struct is `MediaControls`. In order to create this struct you need a `PlatformConfig`. This struct contains all of the platform-specific requirements for spawning media controls. Here are the differences between the platforms:
 
-- MacOS: No config needed, but requires a window to be open ([#23](https://github.com/Sinono3/souvlaki/issues/23))
+- MacOS: No config needed, but requires an AppDelegate/winit event loop (an open window is not required.) ([#23](https://github.com/Sinono3/souvlaki/issues/23))
 - iOS: No config needed.
 - Linux: 
 	- `dbus_name`: The way your player will appear on D-Bus. It should follow [the D-Bus specification](https://dbus.freedesktop.org/doc/dbus-specification.html#message-protocol-names-bus). 
