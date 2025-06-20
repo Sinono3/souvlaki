@@ -5,7 +5,7 @@ use crate::{MediaControlEvent, MediaMetadata, MediaPlayback, PlatformConfig};
 pub struct Error;
 
 impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(f, "Error")
     }
 }
