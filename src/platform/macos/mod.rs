@@ -28,6 +28,14 @@ use crate::{MediaControlEvent, MediaMetadata, MediaPlayback, MediaPosition, Plat
 #[derive(Debug)]
 pub struct Error;
 
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        write!(f, "Error")
+    }
+}
+
+impl std::error::Error for Error {}
+
 /// A handle to OS media controls.
 pub struct MediaControls;
 
@@ -233,10 +241,7 @@ unsafe fn attach_command_handlers(handler: Arc<dyn Fn(MediaControlEvent)>) {
         let handler = handler.clone();
         // event of type MPChangePlaybackPositionCommandEvent
         move |event: id| -> NSInteger {
-            let position = *event
-                .as_ref()
-                .unwrap()
-                .get_ivar::<f64>("_positionTime");
+            let position = *event.as_ref().unwrap().get_ivar::<f64>("_positionTime");
             (handler)(MediaControlEvent::SetPosition(MediaPosition(
                 Duration::from_secs_f64(position),
             )));

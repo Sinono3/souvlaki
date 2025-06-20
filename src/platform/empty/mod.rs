@@ -4,6 +4,14 @@ use crate::{MediaControlEvent, MediaMetadata, MediaPlayback, PlatformConfig};
 #[derive(Debug)]
 pub struct Error;
 
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        write!(f, "Error")
+    }
+}
+
+impl std::error::Error for Error {}
+
 /// A handle to OS media controls.
 pub struct MediaControls;
 
