@@ -1,0 +1,9 @@
+* text=auto
+
+*.rs text
+*.toml text
+*.md text
+*.sh text
+
+*.png binary
+*.jpg binary
