@@ -11,8 +11,8 @@ use std::sync::{mpsc, Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-use crate::{MediaControlEvent, MediaMetadata, MediaPlayback, PlatformConfig};
 use super::super::Error;
+use crate::{MediaControlEvent, MediaMetadata, MediaPlayback, PlatformConfig};
 
 /// A handle to OS media controls.
 pub struct MediaControls {
