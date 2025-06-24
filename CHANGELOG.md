@@ -16,6 +16,22 @@ Types of changes:
 
 ## [Unreleased]
 
+## [0.8.3]
+
+### Added
+
+- rustfmt.toml to enforce formatting
+
+### Changed
+
+- Update README/docs to clarify MacOS Usage (#60 thank you! @ILikeTeaALot)
+
+### Fixed
+
+- Standardized line ending behavior in Git
+- Implement error for all error types (#63 thank you! @nick42d)
+- Exclude dbus on Android (#59 thank you! @will3942)
+
 ## [0.8.2]
 
 ### Fixed
