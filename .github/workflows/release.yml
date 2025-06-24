@@ -1,0 +1,22 @@
+name: Release on tag
+
+on:
+  push:
+    tags:
+      - "*.*.*"
+
+jobs:
+  release:   
+    permissions: write-all
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set env
+        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+      - name: Install ripgrep
+        run: sudo apt-get install -y ripgrep
+      - name: Generate release notes
+        run: rg --color=never -N -u --multiline --multiline-dotall '## \['${RELEASE_VERSION}'\]\n\n(.*?)^## \[' -or '$1' CHANGELOG.md > RELEASE_NOTES.md
+      - uses: softprops/action-gh-release@v2
+        with:
+          body_path: RELEASE_NOTES.md
