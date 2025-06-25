@@ -1,30 +1,22 @@
-#![allow(clippy::module_inception)]
-pub use self::platform::*;
+#[cfg(platform_mpris)]
+pub mod mpris;
+#[cfg(platform_mpris)]
+pub use mpris::{Mpris as OsImpl, MprisError as OsError};
 
-#[cfg(target_os = "windows")]
-#[path = "windows/mod.rs"]
-mod platform;
+// Both macOS and iOS are under the Apple platform
+#[cfg(platform_apple)]
+pub mod macos;
+#[cfg(platform_apple)]
+pub use macos::{Macos as OsImpl, MacosError as OsError};
 
-#[cfg(any(target_os = "macos", target_os = "ios"))]
-#[path = "macos/mod.rs"]
-mod platform;
+#[cfg(platform_windows)]
+pub mod windows;
+#[cfg(platform_windows)]
+pub use windows::{Windows as OsImpl, WindowsError as OsError};
 
-#[cfg(all(
-    unix,
-    not(any(target_os = "macos", target_os = "ios", target_os = "android"))
-))]
-#[path = "mpris/mod.rs"]
-mod platform;
-
-#[cfg(all(
-    not(target_os = "linux"),
-    not(target_os = "netbsd"),
-    not(target_os = "freebsd"),
-    not(target_os = "openbsd"),
-    not(target_os = "dragonfly"),
-    not(target_os = "windows"),
-    not(target_os = "macos"),
-    not(target_os = "ios")
-))]
+/// Dummy platform in case is not supported. All media control operations are simply no-ops.
+#[cfg(not(any(platform_mpris, platform_macos, platform_windows)))]
 #[path = "empty/mod.rs"]
-mod platform;
+pub mod empty;
+#[cfg(not(any(platform_mpris, platform_macos, platform_windows)))]
+pub use empty::{Empty as OsImpl, EmptyError as OsError};

@@ -15,9 +15,12 @@ playerctl position 10-
 playerctl position 10+
 playerctl volume 0.5
 playerctl open "https://testlink.com"
-# TODO: Shuffle and repeat.
-# playerctl shuffle
-# playerctl repeat
+playerctl shuffle On
+playerctl shuffle Off
+playerctl shuffle Toggle
+playerctl loop None
+playerctl loop Track
+playerctl loop Playlist
 
 # The following are commands not supported by playerctl, thus we use dbus-send
 call() {

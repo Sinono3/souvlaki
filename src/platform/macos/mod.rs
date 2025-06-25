@@ -1,4 +1,4 @@
-#![cfg(any(target_os = "macos", target_os = "ios"))]
+#![cfg(platform_macos)]
 #![allow(non_upper_case_globals)]
 
 #[cfg(target_os = "ios")]
@@ -22,31 +22,38 @@ use core_graphics::geometry::CGSize;
 use dispatch::{Queue, QueuePriority};
 use objc::{class, msg_send, sel, sel_impl};
 
-use crate::{MediaControlEvent, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig};
+use crate::{
+    controls::MediaControls, MediaControlEvent, MediaMetadata, MediaPlayback, MediaPosition,
+    PlatformConfig,
+};
 
 /// A platform-specific error.
 #[derive(Debug)]
-pub struct Error;
+pub struct MacosError;
 
-impl std::fmt::Display for Error {
+impl std::fmt::Display for MacosError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(f, "Error")
     }
 }
 
-impl std::error::Error for Error {}
+impl std::error::Error for MacosError {}
 
 /// A handle to OS media controls.
-pub struct MediaControls;
+pub struct Macos;
 
-impl MediaControls {
+pub type OsImpl = Macos;
+
+impl MediaControls for Macos {
+    type Error = MacosError;
+
     /// Create media controls with the specified config.
-    pub fn new(_config: PlatformConfig) -> Result<Self, Error> {
+    fn new(_config: PlatformConfig) -> Result<Self, MacosError> {
         Ok(Self)
     }
 
     /// Attach the media control events to a handler.
-    pub fn attach<F>(&mut self, event_handler: F) -> Result<(), Error>
+    fn attach<F>(&mut self, event_handler: F) -> Result<(), MacosError>
     where
         F: Fn(MediaControlEvent) + Send + 'static,
     {
@@ -55,19 +62,19 @@ impl MediaControls {
     }
 
     /// Detach the event handler.
-    pub fn detach(&mut self) -> Result<(), Error> {
+    fn detach(&mut self) -> Result<(), MacosError> {
         unsafe { detach_command_handlers() };
         Ok(())
     }
 
     /// Set the current playback status.
-    pub fn set_playback(&mut self, playback: MediaPlayback) -> Result<(), Error> {
+    fn set_playback(&mut self, playback: MediaPlayback) -> Result<(), MacosError> {
         unsafe { set_playback_status(playback) };
         Ok(())
     }
 
     /// Set the metadata of the currently playing media item.
-    pub fn set_metadata(&mut self, metadata: MediaMetadata) -> Result<(), Error> {
+    fn set_metadata(&mut self, metadata: MediaMetadata) -> Result<(), MacosError> {
         unsafe { set_playback_metadata(metadata) };
         Ok(())
     }
@@ -116,27 +123,27 @@ unsafe fn set_playback_metadata(metadata: MediaMetadata) {
     let media_center: id = msg_send!(class!(MPNowPlayingInfoCenter), defaultCenter);
     let now_playing: id = msg_send!(class!(NSMutableDictionary), dictionary);
     if let Some(title) = metadata.title {
-        let _: () = msg_send!(now_playing, setObject: ns_string(title)
+        let _: () = msg_send!(now_playing, setObject: ns_string(&title)
                                               forKey: MPMediaItemPropertyTitle);
     }
     if let Some(artist) = metadata.artist {
-        let _: () = msg_send!(now_playing, setObject: ns_string(artist)
+        let _: () = msg_send!(now_playing, setObject: ns_string(&artist)
                                               forKey: MPMediaItemPropertyArtist);
     }
-    if let Some(album) = metadata.album {
-        let _: () = msg_send!(now_playing, setObject: ns_string(album)
+    if let Some(album) = metadata.album_title {
+        let _: () = msg_send!(now_playing, setObject: ns_string(&album)
                                               forKey: MPMediaItemPropertyAlbumTitle);
     }
     if let Some(duration) = metadata.duration {
         let _: () = msg_send!(now_playing, setObject: ns_number(duration.as_secs_f64())
                                               forKey: MPMediaItemPropertyPlaybackDuration);
     }
-    if let Some(cover_url) = metadata.cover_url {
-        let cover_url = cover_url.to_owned();
-        Queue::global(QueuePriority::Default).exec_async(move || {
-            load_and_set_playback_artwork(cover_url, prev_counter + 1);
-        });
-    }
+    // if let Some(cover_url) = metadata.cover_url {
+    //     let cover_url = cover_url.to_owned();
+    //     Queue::global(QueuePriority::Default).exec_async(move || {
+    //         load_and_set_playback_artwork(cover_url, prev_counter + 1);
+    //     });
+    // }
     let _: () = msg_send!(media_center, setNowPlayingInfo: now_playing);
 }
 

@@ -1,46 +1,43 @@
-use crate::{MediaControlEvent, MediaMetadata, MediaPlayback, PlatformConfig};
+use crate::{MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, PlatformConfig};
 
 /// A platform-specific error.
 #[derive(Debug)]
-pub struct Error;
+pub struct EmptyError;
 
-impl std::fmt::Display for Error {
+impl std::fmt::Display for EmptyError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(f, "Error")
     }
 }
 
-impl std::error::Error for Error {}
+impl std::error::Error for EmptyError {}
 
 /// A handle to OS media controls.
-pub struct MediaControls;
+pub struct Empty;
 
-impl MediaControls {
-    /// Create media controls with the specified config.
-    pub fn new(_config: PlatformConfig) -> Result<Self, Error> {
+impl MediaControls for Empty {
+    type Error = EmptyError;
+
+    fn new(_config: PlatformConfig) -> Result<Self, EmptyError> {
         Ok(Self)
     }
 
-    /// Attach the media control events to a handler.
-    pub fn attach<F>(&mut self, _event_handler: F) -> Result<(), Error>
+    fn attach<F>(&mut self, _event_handler: F) -> Result<(), EmptyError>
     where
         F: Fn(MediaControlEvent) + Send + 'static,
     {
         Ok(())
     }
 
-    /// Detach the event handler.
-    pub fn detach(&mut self) -> Result<(), Error> {
+    fn detach(&mut self) -> Result<(), EmptyError> {
         Ok(())
     }
 
-    /// Set the current playback status.
-    pub fn set_playback(&mut self, _playback: MediaPlayback) -> Result<(), Error> {
+    fn set_playback(&mut self, _playback: MediaPlayback) -> Result<(), EmptyError> {
         Ok(())
     }
 
-    /// Set the metadata of the currently playing media item.
-    pub fn set_metadata(&mut self, _metadata: MediaMetadata) -> Result<(), Error> {
+    fn set_metadata(&mut self, _metadata: MediaMetadata) -> Result<(), EmptyError> {
         Ok(())
     }
 }

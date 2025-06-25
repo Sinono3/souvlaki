@@ -1,4 +1,4 @@
-#![cfg(all(unix, not(target_os = "macos")))]
+#![cfg(platform_mpris)]
 
 #[cfg(not(any(feature = "dbus", feature = "zbus")))]
 compile_error!("either feature \"dbus\" or feature \"zbus\" are required");
@@ -9,20 +9,20 @@ compile_error!("feature \"dbus\" and feature \"zbus\" are mutually exclusive");
 #[cfg(feature = "zbus")]
 mod zbus;
 #[cfg(feature = "zbus")]
-pub use self::zbus::*;
+pub use self::zbus::Zbus as Mpris;
 #[cfg(feature = "zbus")]
 extern crate zbus as zbus_crate;
 
 #[cfg(feature = "dbus")]
 mod dbus;
 #[cfg(feature = "dbus")]
-pub use self::dbus::*;
+pub use self::dbus::Dbus as Mpris;
 #[cfg(feature = "dbus")]
 extern crate dbus as dbus_crate;
 
 /// A platform-specific error.
 #[derive(thiserror::Error, Debug)]
-pub enum Error {
+pub enum MprisError {
     #[error("internal D-Bus error: {0}")]
     #[cfg(feature = "dbus")]
     DbusError(#[from] dbus_crate::Error),

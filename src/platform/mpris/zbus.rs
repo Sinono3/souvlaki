@@ -9,14 +9,17 @@ use std::time::Duration;
 use zbus::{dbus_interface, ConnectionBuilder, SignalContext};
 use zvariant::{ObjectPath, Value};
 
+use crate::extensions::MprisPropertiesExt;
+use crate::LoopStatus;
 use crate::{
-    MediaControlEvent, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig, SeekDirection,
+    MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig,
+    SeekDirection,
 };
 
-use super::Error;
+use super::MprisError;
 
 /// A handle to OS media controls.
-pub struct MediaControls {
+pub struct Zbus {
     thread: Option<ServiceThreadHandle>,
     dbus_name: String,
     friendly_name: String,
@@ -24,48 +27,38 @@ pub struct MediaControls {
 
 struct ServiceThreadHandle {
     event_channel: mpsc::Sender<InternalEvent>,
-    thread: JoinHandle<()>,
-}
-
-#[derive(Clone, PartialEq, Debug)]
-enum InternalEvent {
-    ChangeMetadata(OwnedMetadata),
-    ChangePlayback(MediaPlayback),
-    ChangeVolume(f64),
-    Kill,
+    thread: JoinHandle<Result<(), MprisError>>,
 }
 
 #[derive(Clone, Debug)]
-struct ServiceState {
-    metadata: OwnedMetadata,
-    playback_status: MediaPlayback,
-    volume: f64,
+enum InternalEvent {
+    SetMetadata(MediaMetadata),
+    SetPlayback(MediaPlayback),
+    SetLoopStatus(LoopStatus),
+    SetRate(f64),
+    SetShuffle(bool),
+    SetVolume(f64),
+    SetMaximumRate(f64),
+    SetMinimumRate(f64),
+    Kill,
 }
 
-#[derive(Clone, PartialEq, Eq, Debug, Default)]
-struct OwnedMetadata {
-    pub title: Option<String>,
-    pub album: Option<String>,
-    pub artist: Option<String>,
-    pub cover_url: Option<String>,
-    pub duration: Option<i64>,
+#[derive(Debug)]
+pub struct ServiceState {
+    pub playback_status: MediaPlayback,
+    pub loop_status: LoopStatus,
+    pub rate: f64,
+    pub shuffle: bool,
+    pub metadata: MediaMetadata,
+    pub volume: f64,
+    pub maximum_rate: f64,
+    pub minimum_rate: f64,
 }
 
-impl From<MediaMetadata<'_>> for OwnedMetadata {
-    fn from(other: MediaMetadata) -> Self {
-        OwnedMetadata {
-            title: other.title.map(|s| s.to_string()),
-            artist: other.artist.map(|s| s.to_string()),
-            album: other.album.map(|s| s.to_string()),
-            cover_url: other.cover_url.map(|s| s.to_string()),
-            duration: other.duration.map(|d| d.as_micros().try_into().unwrap()),
-        }
-    }
-}
+impl MediaControls for Zbus {
+    type Error = MprisError;
 
-impl MediaControls {
-    /// Create media controls with the specified config.
-    pub fn new(config: PlatformConfig) -> Result<Self, Error> {
+    fn new(config: PlatformConfig) -> Result<Self, Self::Error> {
         let PlatformConfig {
             dbus_name,
             display_name,
@@ -79,8 +72,7 @@ impl MediaControls {
         })
     }
 
-    /// Attach the media control events to a handler.
-    pub fn attach<F>(&mut self, event_handler: F) -> Result<(), Error>
+    fn attach<F>(&mut self, event_handler: F) -> Result<(), Self::Error>
     where
         F: Fn(MediaControlEvent) + Send + 'static,
     {
@@ -95,49 +87,68 @@ impl MediaControls {
             event_channel,
             thread: thread::spawn(move || {
                 pollster::block_on(run_service(dbus_name, friendly_name, event_handler, rx))
-                    .unwrap();
+                    .map_err(|e| e.into())
             }),
         });
         Ok(())
     }
-    /// Detach the event handler.
-    pub fn detach(&mut self) -> Result<(), Error> {
+
+    fn detach(&mut self) -> Result<(), Self::Error> {
         if let Some(ServiceThreadHandle {
             event_channel,
             thread,
         }) = self.thread.take()
         {
             event_channel.send(InternalEvent::Kill).ok();
-            thread.join().map_err(|_| Error::ThreadPanicked)?;
+            thread.join().map_err(|_| Self::Error::ThreadPanicked)??;
         }
         Ok(())
     }
 
-    /// Set the current playback status.
-    pub fn set_playback(&mut self, playback: MediaPlayback) -> Result<(), Error> {
-        self.send_internal_event(InternalEvent::ChangePlayback(playback))?;
-        Ok(())
+    fn set_playback(&mut self, playback: MediaPlayback) -> Result<(), Self::Error> {
+        self.send_internal_event(InternalEvent::SetPlayback(playback))
     }
 
-    /// Set the metadata of the currently playing media item.
-    pub fn set_metadata(&mut self, metadata: MediaMetadata) -> Result<(), Error> {
-        self.send_internal_event(InternalEvent::ChangeMetadata(metadata.into()))?;
-        Ok(())
+    fn set_metadata(&mut self, metadata: MediaMetadata) -> Result<(), Self::Error> {
+        self.send_internal_event(InternalEvent::SetMetadata(metadata.into()))
     }
+}
 
-    /// Set the volume level (0.0 - 1.0) (Only available on MPRIS)
-    pub fn set_volume(&mut self, volume: f64) -> Result<(), Error> {
-        self.send_internal_event(InternalEvent::ChangeVolume(volume))?;
-        Ok(())
-    }
-
-    fn send_internal_event(&mut self, event: InternalEvent) -> Result<(), Error> {
+impl Zbus {
+    fn send_internal_event(&mut self, event: InternalEvent) -> Result<(), MprisError> {
         let channel = &self
             .thread
             .as_ref()
-            .ok_or(Error::ThreadNotRunning)?
+            .ok_or(MprisError::ThreadNotRunning)?
             .event_channel;
-        channel.send(event).map_err(|_| Error::ThreadPanicked)
+        channel.send(event).map_err(|_| MprisError::ThreadPanicked)
+    }
+}
+
+// TODO: move to extension trait
+impl MprisPropertiesExt for Zbus {
+    fn set_loop_status(&mut self, loop_status: LoopStatus) -> Result<(), Self::Error> {
+        self.send_internal_event(InternalEvent::SetLoopStatus(loop_status))
+    }
+
+    fn set_rate(&mut self, rate: f64) -> Result<(), Self::Error> {
+        self.send_internal_event(InternalEvent::SetRate(rate))
+    }
+
+    fn set_shuffle(&mut self, shuffle: bool) -> Result<(), Self::Error> {
+        self.send_internal_event(InternalEvent::SetShuffle(shuffle))
+    }
+
+    fn set_volume(&mut self, volume: f64) -> Result<(), Self::Error> {
+        self.send_internal_event(InternalEvent::SetVolume(volume))
+    }
+
+    fn set_maximum_rate(&mut self, rate: f64) -> Result<(), Self::Error> {
+        self.send_internal_event(InternalEvent::SetMaximumRate(rate))
+    }
+
+    fn set_minimum_rate(&mut self, rate: f64) -> Result<(), Self::Error> {
+        self.send_internal_event(InternalEvent::SetMinimumRate(rate))
     }
 }
 
@@ -244,7 +255,7 @@ impl PlayerInterface {
         if let Ok(micros) = position.try_into() {
             if let Some(duration) = self.state.metadata.duration {
                 // If the Position argument is greater than the track length, do nothing.
-                if position > duration {
+                if position > duration.as_micros().try_into().unwrap() {
                     return;
                 }
             }
@@ -259,18 +270,43 @@ impl PlayerInterface {
         self.send_event(MediaControlEvent::OpenUri(uri));
     }
 
+    // TODO: Seeked signal missing
+
     #[dbus_interface(property)]
     fn playback_status(&self) -> &'static str {
-        match self.state.playback_status {
-            MediaPlayback::Playing { .. } => "Playing",
-            MediaPlayback::Paused { .. } => "Paused",
-            MediaPlayback::Stopped => "Stopped",
+        self.state.playback_status.to_dbus_value()
+    }
+
+    #[dbus_interface(property)]
+    fn loop_status(&self) -> &'static str {
+        self.state.loop_status.to_dbus_value()
+    }
+
+    #[dbus_interface(property)]
+    fn set_loop_status(&self, loop_status: &str) {
+        if let Some(loop_status) = LoopStatus::from_dbus_value(loop_status) {
+            self.send_event(MediaControlEvent::SetLoopStatus(loop_status));
         }
     }
 
     #[dbus_interface(property)]
     fn rate(&self) -> f64 {
-        1.0
+        self.state.rate
+    }
+
+    #[dbus_interface(property)]
+    fn set_rate(&self, rate: f64) {
+        self.send_event(MediaControlEvent::SetPlaybackRate(rate));
+    }
+
+    #[dbus_interface(property)]
+    fn shuffle(&self) -> bool {
+        self.state.shuffle
+    }
+
+    #[dbus_interface(property)]
+    fn set_shuffle(&self, shuffle: bool) {
+        self.send_event(MediaControlEvent::SetShuffle(shuffle));
     }
 
     #[dbus_interface(property)]
@@ -278,12 +314,25 @@ impl PlayerInterface {
         // TODO: this should be stored in a cache inside the state.
         let mut dict = HashMap::<&str, Value>::new();
 
-        let OwnedMetadata {
+        let MediaMetadata {
             ref title,
-            ref album,
-            ref artist,
-            ref cover_url,
-            ref duration,
+            ref album_title,
+            ref artists,
+            ref album_artists,
+            ref genres,
+            track_number,
+            disc_number,
+            ref composers,
+            ref lyricists,
+            ref lyrics,
+            ref comments,
+            beats_per_minute,
+            user_rating_01,
+            auto_rating,
+            play_count,
+            ref media_url,
+            duration,
+            ..
         } = self.state.metadata;
 
         // MPRIS
@@ -294,22 +343,76 @@ impl PlayerInterface {
         );
 
         if let Some(length) = duration {
-            dict.insert("mpris:length", Value::new(*length));
+            dict.insert(
+                "mpris:length",
+                Value::new(i64::try_from(length.as_micros()).unwrap()),
+            );
         }
 
-        if let Some(cover_url) = cover_url {
-            dict.insert("mpris:artUrl", Value::new(cover_url.clone()));
-        }
+        // TODO
+        // if let Some(cover_url) = cover_url {
+        //     dict.insert("mpris:artUrl", Value::new(cover_url.clone()));
+        // }
 
         // Xesam
         if let Some(title) = title {
             dict.insert("xesam:title", Value::new(title.clone()));
         }
-        if let Some(artist) = artist {
-            dict.insert("xesam:artist", Value::new(vec![artist.clone()]));
+        if let Some(artists) = artists {
+            dict.insert("xesam:artist", Value::new(artists.clone()));
         }
-        if let Some(album) = album {
-            dict.insert("xesam:album", Value::new(album.clone()));
+        if let Some(album_title) = album_title {
+            dict.insert("xesam:album", Value::new(album_title.clone()));
+        }
+        if let Some(album_artists) = album_artists {
+            dict.insert("xesam:albumArtist", Value::new(album_artists.clone()));
+        }
+        if let Some(genres) = genres {
+            dict.insert("xesam:genre", Value::new(genres.clone()));
+        }
+        if let Some(track_number) = track_number {
+            dict.insert("xesam:trackNumber", Value::new(track_number));
+        }
+        if let Some(disc_number) = disc_number {
+            dict.insert("xesam:discNumber", Value::new(disc_number));
+        }
+        if let Some(composers) = composers {
+            dict.insert("xesam:composer", Value::new(composers.clone()));
+        }
+        if let Some(lyricists) = lyricists {
+            dict.insert("xesam:lyricist", Value::new(lyricists.clone()));
+        }
+        if let Some(lyrics) = lyrics {
+            dict.insert("xesam:asText", Value::new(lyrics.clone()));
+        }
+        if let Some(comments) = comments {
+            dict.insert("xesam:comment", Value::new(comments.clone()));
+        }
+        if let Some(beats_per_minute) = beats_per_minute {
+            dict.insert("xesam:audioBPM", Value::new(beats_per_minute));
+        }
+        if let Some(user_rating_01) = user_rating_01 {
+            dict.insert("xesam:userRating", Value::new(user_rating_01));
+        }
+        if let Some(auto_rating) = auto_rating {
+            dict.insert("xesam:autoRating", Value::new(auto_rating));
+        }
+        if let Some(play_count) = play_count {
+            dict.insert("xesam:playCount", Value::new(play_count));
+        }
+        if let Some(media_url) = media_url {
+            dict.insert("xesam:url", Value::new(media_url.clone()));
+        }
+
+        #[cfg(feature = "date")]
+        {
+            let &MediaMetadata {
+                ref content_created,
+                ref first_played,
+                ref last_played,
+            } = metadata;
+            // TODO: handle date types
+            todo!();
         }
         dict
     }
@@ -340,13 +443,13 @@ impl PlayerInterface {
     }
 
     #[dbus_interface(property)]
-    fn minimum_rate(&self) -> f64 {
-        1.0
+    fn maximum_rate(&self) -> f64 {
+        self.state.maximum_rate
     }
 
     #[dbus_interface(property)]
-    fn maximum_rate(&self) -> f64 {
-        1.0
+    fn minimum_rate(&self) -> f64 {
+        self.state.minimum_rate
     }
 
     #[dbus_interface(property)]
@@ -393,9 +496,14 @@ async fn run_service(
 
     let player = PlayerInterface {
         state: ServiceState {
-            metadata: OwnedMetadata::default(),
             playback_status: MediaPlayback::Stopped,
+            loop_status: LoopStatus::None,
+            rate: 1.0,
+            shuffle: false,
+            metadata: Default::default(),
             volume: 1.0,
+            maximum_rate: 1.0,
+            minimum_rate: 1.0,
         },
         event_handler,
     };
@@ -411,10 +519,6 @@ async fn run_service(
 
     loop {
         if let Ok(event) = event_channel.recv_timeout(Duration::from_millis(10)) {
-            if event == InternalEvent::Kill {
-                break;
-            }
-
             let interface_ref = connection
                 .object_server()
                 .interface::<_, PlayerInterface>(&path)
@@ -423,19 +527,39 @@ async fn run_service(
             let ctxt = SignalContext::new(&connection, &path)?;
 
             match event {
-                InternalEvent::ChangeMetadata(metadata) => {
+                InternalEvent::SetMetadata(metadata) => {
                     interface.state.metadata = metadata;
                     interface.metadata_changed(&ctxt).await?;
                 }
-                InternalEvent::ChangePlayback(playback) => {
+                InternalEvent::SetPlayback(playback) => {
                     interface.state.playback_status = playback;
                     interface.playback_status_changed(&ctxt).await?;
                 }
-                InternalEvent::ChangeVolume(volume) => {
+                InternalEvent::SetLoopStatus(loop_status) => {
+                    interface.state.loop_status = loop_status;
+                    interface.loop_status_changed(&ctxt).await?;
+                }
+                InternalEvent::SetVolume(volume) => {
                     interface.state.volume = volume;
                     interface.volume_changed(&ctxt).await?;
                 }
-                InternalEvent::Kill => (),
+                InternalEvent::SetRate(rate) => {
+                    interface.state.rate = rate;
+                    interface.rate_changed(&ctxt).await?;
+                }
+                InternalEvent::SetMaximumRate(rate) => {
+                    interface.state.maximum_rate = rate;
+                    interface.maximum_rate_changed(&ctxt).await?;
+                }
+                InternalEvent::SetMinimumRate(rate) => {
+                    interface.state.minimum_rate = rate;
+                    interface.minimum_rate_changed(&ctxt).await?;
+                }
+                InternalEvent::SetShuffle(shuffle) => {
+                    interface.state.shuffle = shuffle;
+                    interface.shuffle_changed(&ctxt).await?;
+                }
+                InternalEvent::Kill => break,
             }
         }
     }

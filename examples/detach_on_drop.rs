@@ -1,4 +1,4 @@
-use souvlaki::{MediaControls, PlatformConfig};
+use souvlaki::{OsMediaControls, PlatformConfig};
 use std::thread::sleep;
 use std::time::Duration;
 
@@ -21,7 +21,7 @@ fn main() {
             hwnd,
         };
 
-        let mut controls = MediaControls::new(config).unwrap();
+        let mut controls = OsMediaControls::new(config).unwrap();
 
         controls.attach(|_| println!("Received message")).unwrap();
         println!("Attached");

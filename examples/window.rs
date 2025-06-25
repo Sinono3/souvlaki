@@ -1,6 +1,6 @@
 use std::{sync::mpsc, thread::sleep, time::Duration};
 
-use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, PlatformConfig};
+use souvlaki::{MediaControlEvent, MediaMetadata, MediaPlayback, OsMediaControls, PlatformConfig};
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -37,7 +37,7 @@ fn main() {
         hwnd,
     };
 
-    let mut controls = MediaControls::new(config).unwrap();
+    let mut controls = OsMediaControls::new(config).unwrap();
 
     let (tx, rx) = mpsc::sync_channel(32);
     let mut app = TestApp {
@@ -51,11 +51,12 @@ fn main() {
         .unwrap();
     controls
         .set_metadata(MediaMetadata {
-            title: Some("When The Sun Hits"),
-            album: Some("Souvlaki"),
-            artist: Some("Slowdive"),
+            title: Some("When The Sun Hits".to_owned()),
+            album_title: Some("Souvlaki".to_owned()),
+            artist: Some("Slowdive".to_owned()),
             duration: Some(Duration::from_secs_f64(4.0 * 60.0 + 50.0)),
-            cover_url: Some("https://c.pxhere.com/photos/34/c1/souvlaki_authentic_greek_greek_food_mezes-497780.jpg!d"),
+            // cover_url: Some("https://c.pxhere.com/photos/34/c1/souvlaki_authentic_greek_greek_food_mezes-497780.jpg!d"),
+            ..Default::default()
         })
         .unwrap();
 

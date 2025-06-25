@@ -7,7 +7,7 @@ use std::{
 use dbus::Path;
 use dbus_crossroads::{Crossroads, IfaceBuilder};
 
-use crate::{MediaControlEvent, MediaPlayback, MediaPosition, SeekDirection};
+use crate::{LoopStatus, MediaControlEvent, MediaPlayback, MediaPosition, SeekDirection};
 
 use super::controls::{create_metadata_dict, ServiceState};
 
@@ -98,7 +98,7 @@ where
 
                 if let Some(duration) = state.metadata.duration {
                     // If the Position argument is greater than the track length, do nothing.
-                    if position > duration {
+                    if position > duration.as_micros().try_into().unwrap() {
                         return Ok(());
                     }
                 }
@@ -131,12 +131,65 @@ where
                 let state = state.clone();
                 move |_, _| {
                     let state = state.lock().unwrap();
-                    Ok(state.get_playback_status().to_string())
+                    Ok(state.playback_status.to_dbus_value().to_string())
                 }
             })
             .emits_changed_true();
 
-        b.property("Rate").get(|_, _| Ok(1.0)).emits_changed_true();
+        b.property("LoopStatus")
+            .get({
+                let state = state.clone();
+                move |_, _| {
+                    let state = state.lock().unwrap();
+                    Ok(state.loop_status.to_dbus_value().to_string())
+                }
+            })
+            .set({
+                let event_handler = event_handler.clone();
+                move |_, _, loop_status_dbus: String| {
+                    let Some(loop_status) = LoopStatus::from_dbus_value(&loop_status_dbus) else {
+                        // If invalid, just ignore it
+                        return Ok(None);
+                    };
+                    (event_handler.lock().unwrap())(MediaControlEvent::SetLoopStatus(loop_status));
+                    Ok(Some(loop_status_dbus))
+                }
+            })
+            .emits_changed_true();
+
+        b.property("Rate")
+            .get({
+                let state = state.clone();
+                move |_, _| {
+                    let state = state.lock().unwrap();
+                    Ok(state.rate)
+                }
+            })
+            .set({
+                let event_handler = event_handler.clone();
+                move |_, _, rate: f64| {
+                    (event_handler.lock().unwrap())(MediaControlEvent::SetPlaybackRate(rate));
+                    Ok(Some(rate))
+                }
+            })
+            .emits_changed_true();
+
+        b.property("Shuffle")
+            .get({
+                let state = state.clone();
+                move |_, _| {
+                    let state = state.lock().unwrap();
+                    Ok(state.shuffle)
+                }
+            })
+            .set({
+                let event_handler = event_handler.clone();
+                move |_, _, shuffle: bool| {
+                    (event_handler.lock().unwrap())(MediaControlEvent::SetShuffle(shuffle));
+                    Ok(Some(shuffle))
+                }
+            })
+            .emits_changed_true();
 
         b.property("Metadata")
             .get({
@@ -181,13 +234,26 @@ where
             }
         });
 
-        b.property("MinimumRate")
-            .get(|_, _| Ok(1.0))
-            .emits_changed_true();
         b.property("MaximumRate")
-            .get(|_, _| Ok(1.0))
+            .get({
+                let state = state.clone();
+                move |_, _| {
+                    let state = state.lock().unwrap();
+                    Ok(state.maximum_rate)
+                }
+            })
+            .emits_changed_true();
+        b.property("MinimumRate")
+            .get({
+                let state = state.clone();
+                move |_, _| {
+                    let state = state.lock().unwrap();
+                    Ok(state.minimum_rate)
+                }
+            })
             .emits_changed_true();
 
+        // TODO: Control capabilities
         b.property("CanGoNext")
             .get(|_, _| Ok(true))
             .emits_changed_true();

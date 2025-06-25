@@ -1,4 +1,4 @@
 mod interfaces;
 
 mod controls;
-pub use controls::MediaControls;
+pub use controls::Dbus;

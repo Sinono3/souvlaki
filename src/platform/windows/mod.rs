@@ -1,5 +1,3 @@
-#![cfg(target_os = "windows")]
-
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use windows::core::{Error as WindowsError, HSTRING};
@@ -14,7 +12,7 @@ use crate::{
 };
 
 /// A handle to OS media controls.
-pub struct MediaControls {
+pub struct Windows {
     controls: SystemMediaTransportControls,
     button_handler_token: Option<EventRegistrationToken>,
     display_updater: SystemMediaTransportControlsDisplayUpdater,
@@ -47,7 +45,7 @@ impl From<WindowsError> for Error {
     }
 }
 
-impl MediaControls {
+impl Windows {
     /// Create media controls with the specified config.
     pub fn new(config: PlatformConfig) -> Result<Self, Error> {
         let interop: ISystemMediaTransportControlsInterop = windows::core::factory::<
@@ -56,7 +54,7 @@ impl MediaControls {
         >()?;
         let hwnd = config
             .hwnd
-            .expect("Windows media controls require an HWND in MediaControlsOptions.");
+            .expect("Windows media controls require an HWND in PlatformConfig.");
 
         let controls: SystemMediaTransportControls =
             unsafe { interop.GetForWindow(HWND(hwnd as isize)) }?;

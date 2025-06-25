@@ -6,7 +6,7 @@ A cross-platform library for handling OS media controls and metadata. One abstra
 
 ## Supported platforms
 
-- Linux (via MPRIS)
+- Linux/BSD (via MPRIS)
 - MacOS/iOS
 - Windows
 
