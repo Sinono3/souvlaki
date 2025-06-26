@@ -1,11 +1,12 @@
-use crate::{MediaControlEvent, MediaMetadata, MediaPlayback, PlatformConfig};
+use crate::{MediaControlEvent, MediaMetadata, MediaPlayback};
 
 /// Defines fundamental operations needed for media controls.
 pub trait MediaControls: Sized {
     type Error;
+    type PlatformConfig;
 
     /// Create media controls with the specified config.
-    fn new(config: PlatformConfig) -> Result<Self, Self::Error>;
+    fn new(config: Self::PlatformConfig) -> Result<Self, Self::Error>;
     /// Attach the media control events to a handler.
     fn attach<F>(&mut self, event_handler: F) -> Result<(), Self::Error>
     where
@@ -27,7 +28,7 @@ pub struct MediaControlsWrapper<OsImpl: MediaControls> {
 
 impl<T: MediaControls> MediaControlsWrapper<T> {
     /// Create media controls with the specified config.
-    pub fn new(config: PlatformConfig) -> Result<Self, T::Error> {
+    pub fn new(config: T::PlatformConfig) -> Result<Self, T::Error> {
         Ok(Self {
             inner: T::new(config)?,
         })

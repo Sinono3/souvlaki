@@ -2,7 +2,6 @@
 
 use std::{fmt::Debug, time::Duration};
 
-mod config;
 mod controls;
 mod cover;
 /// Contains traits which extend MediaControls by adding additional methods
@@ -12,7 +11,6 @@ mod metadata;
 /// The platform-specific implementations of the media controls.
 pub mod platform;
 
-pub use config::*;
 pub use controls::{MediaControls, MediaControlsWrapper};
 pub use cover::MediaCover;
 pub use metadata::*;

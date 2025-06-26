@@ -4,20 +4,17 @@ use std::convert::TryInto;
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 use std::time::Duration;
-use zbus::{dbus_interface, ConnectionBuilder, SignalContext};
 
+use zbus::{dbus_interface, ConnectionBuilder, SignalContext};
 use zvariant::ObjectPath;
 
-use super::create_metadata_dict;
-use super::InternalEvent;
-use super::MprisError;
-use super::ServiceState;
-use super::ServiceThreadHandle;
+use super::{
+    create_metadata_dict, InternalEvent, MprisConfig, MprisError, ServiceState, ServiceThreadHandle,
+};
 use crate::platform::mpris::MetadataDict;
 use crate::Loop;
 use crate::{
-    MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig,
-    SeekDirection,
+    MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, SeekDirection,
 };
 
 /// A handle to OS media controls.
@@ -43,12 +40,12 @@ impl Zbus {
 
 impl MediaControls for Zbus {
     type Error = MprisError;
+    type PlatformConfig = MprisConfig;
 
-    fn new(config: PlatformConfig) -> Result<Self, Self::Error> {
-        let PlatformConfig {
+    fn new(config: Self::PlatformConfig) -> Result<Self, Self::Error> {
+        let Self::PlatformConfig {
             dbus_name,
             display_name,
-            ..
         } = config;
 
         Ok(Self {

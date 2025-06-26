@@ -11,9 +11,9 @@ use std::thread;
 use std::time::Duration;
 
 use super::super::{
-    create_metadata_dict, InternalEvent, MprisError, ServiceState, ServiceThreadHandle,
+    create_metadata_dict, InternalEvent, MprisConfig, MprisError, ServiceState, ServiceThreadHandle,
 };
-use crate::{MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, PlatformConfig};
+use crate::{MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback};
 
 /// A handle to OS media controls.
 pub struct Dbus {
@@ -36,12 +36,12 @@ impl Dbus {
 }
 impl MediaControls for Dbus {
     type Error = MprisError;
+    type PlatformConfig = MprisConfig;
 
-    fn new(config: PlatformConfig) -> Result<Self, Self::Error> {
-        let PlatformConfig {
+    fn new(config: Self::PlatformConfig) -> Result<Self, Self::Error> {
+        let Self::PlatformConfig {
             dbus_name,
             display_name,
-            ..
         } = config;
 
         Ok(Self {

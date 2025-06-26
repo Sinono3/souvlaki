@@ -16,6 +16,15 @@ mod dbus;
 #[cfg(feature = "dbus")]
 pub use self::dbus::Dbus as Mpris;
 
+/// MPRIS-specific configuration needed to create media controls.
+#[derive(Debug)]
+pub struct MprisConfig {
+    /// The name to be displayed to the user. (*Required on Linux*)
+    pub display_name: String,
+    /// Should follow [the D-Bus spec](https://dbus.freedesktop.org/doc/dbus-specification.html#message-protocol-names-bus). (*Required on Linux*)
+    pub dbus_name: String,
+}
+
 /// A platform-specific error.
 #[derive(thiserror::Error, Debug)]
 pub enum MprisError {

@@ -1,3 +1,4 @@
+use std::ffi::c_void;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use windows::core::{Error as WindowsError, HSTRING};
@@ -17,6 +18,13 @@ pub struct Windows {
     button_handler_token: Option<EventRegistrationToken>,
     display_updater: SystemMediaTransportControlsDisplayUpdater,
     timeline_properties: SystemMediaTransportControlsTimelineProperties,
+}
+
+/// Windows-specific configuration needed to create media controls.
+#[derive(Debug)]
+pub struct WindowsConfig {
+    /// HWND. A window handle specific to Windows.
+    pub hwnd: *mut c_void,
 }
 
 #[repr(i32)]

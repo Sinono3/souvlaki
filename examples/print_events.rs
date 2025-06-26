@@ -1,23 +1,37 @@
-use souvlaki::{MediaControlEvent, OsMediaControls, PlatformConfig};
+use souvlaki::{MediaControlEvent, OsMediaControls};
 
 mod sample_data;
 
 fn main() {
-    #[cfg(not(target_os = "windows"))]
-    let hwnd = None;
+    // MPRIS platform
+    #[cfg(all(
+        unix,
+        not(any(target_os = "macos", target_os = "ios", target_os = "android"))
+    ))]
+    let config = souvlaki::platform::mpris::MprisConfig {
+        display_name: "My Player".to_owned(),
+        dbus_name: "my_player".to_owned(),
+    };
 
+    // macOS platform
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    let config = ();
+
+    // Windows platform
     #[cfg(target_os = "windows")]
-    let (hwnd, _dummy_window) = {
+    let (config, hwnd, _dummy_window) = {
         let dummy_window = windows::DummyWindow::new().unwrap();
         let handle = Some(dummy_window.handle.0 as _);
-        (handle, dummy_window)
+        let config = souvlaki::platform::windows::WindowsConfig { hwnd: handle.hwnd };
+        (config, handle, dummy_window)
     };
 
-    let config = PlatformConfig {
-        dbus_name: "my_player",
-        display_name: "My Player",
-        hwnd,
-    };
+    // Dummy platform (for unsupported OSes)
+    #[cfg(any(
+        not(any(unix, target_os = "macos", target_os = "ios", target_os = "windows")),
+        target_os = "android",
+    ))]
+    let config = ();
 
     let mut controls = OsMediaControls::new(config).unwrap();
 

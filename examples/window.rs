@@ -1,6 +1,6 @@
 use std::{sync::mpsc, thread::sleep, time::Duration};
 
-use souvlaki::{MediaControlEvent, MediaPlayback, OsMediaControls, PlatformConfig};
+use souvlaki::{MediaControlEvent, MediaPlayback, OsMediaControls};
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -19,25 +19,35 @@ fn main() {
     #[allow(unused_variables)]
     let window = WindowBuilder::new().build(&event_loop).unwrap();
 
-    #[cfg(not(target_os = "windows"))]
-    let hwnd = None;
+    // MPRIS platform
+    #[cfg(all(
+        unix,
+        not(any(target_os = "macos", target_os = "ios", target_os = "android"))
+    ))]
+    let config = souvlaki::platform::mpris::MprisConfig {
+        display_name: "My Player".to_owned(),
+        dbus_name: "my_player".to_owned(),
+    };
 
+    // macOS platform
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    let config = ();
+
+    // Windows platform
     #[cfg(target_os = "windows")]
-    let hwnd = {
-        use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
+    let config = {
+        use raw_window_handle::Win32WindowHandle;
 
-        let handle = match window.raw_window_handle() {
-            RawWindowHandle::Win32(h) => h,
-            _ => unreachable!(),
-        };
-        Some(handle.hwnd)
+        let handle: Win32WindowHandle = unimplemented!();
+        souvlaki::platform::windows::WindowsConfig { hwnd: handle.hwnd }
     };
 
-    let config = PlatformConfig {
-        dbus_name: "my_player",
-        display_name: "My Player",
-        hwnd,
-    };
+    // Dummy platform (for unsupported OSes)
+    #[cfg(any(
+        not(any(unix, target_os = "macos", target_os = "ios", target_os = "windows")),
+        target_os = "android",
+    ))]
+    let config = ();
 
     let mut controls = OsMediaControls::new(config).unwrap();
 

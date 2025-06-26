@@ -24,7 +24,6 @@ use objc::{class, msg_send, sel, sel_impl};
 
 use crate::{
     controls::MediaControls, MediaControlEvent, MediaMetadata, MediaPlayback, MediaPosition,
-    PlatformConfig,
 };
 
 /// A platform-specific error.
@@ -46,8 +45,9 @@ pub type OsImpl = Macos;
 
 impl MediaControls for Macos {
     type Error = MacosError;
+    type PlatformConfig = ();
 
-    fn new(_config: PlatformConfig) -> Result<Self, MacosError> {
+    fn new(_config: Self::PlatformConfig) -> Result<Self, MacosError> {
         Ok(Self)
     }
 
