@@ -1,18 +1,21 @@
 use std::ffi::c_void;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use windows::core::{Error as WindowsError, HSTRING};
-use windows::Foundation::{EventRegistrationToken, TimeSpan, TypedEventHandler, Uri};
-use windows::Media::*;
-use windows::Storage::Streams::RandomAccessStreamReference;
-use windows::Win32::Foundation::HWND;
-use windows::Win32::System::WinRT::ISystemMediaTransportControlsInterop;
+
+use ::windows::core::HSTRING;
+use ::windows::Foundation::{EventRegistrationToken, TimeSpan, TypedEventHandler, Uri};
+use ::windows::Media::*;
+use ::windows::Storage::Streams::RandomAccessStreamReference;
+use ::windows::Win32::Foundation::HWND;
+use ::windows::Win32::System::WinRT::ISystemMediaTransportControlsInterop;
 
 use crate::{
-    MediaControlEvent, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig, SeekDirection,
+    MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, SeekDirection,
 };
 
-/// A handle to OS media controls.
+pub use ::windows::core::Error as WindowsError;
+
+/// A handle to Windows' SystemMediaTransportControls
 pub struct Windows {
     controls: SystemMediaTransportControls,
     button_handler_token: Option<EventRegistrationToken>,
@@ -35,37 +38,17 @@ enum SmtcPlayback {
     Paused = 4,
 }
 
-/// A platform-specific error.
-#[derive(Debug)]
-pub struct Error(WindowsError);
+impl MediaControls for Windows {
+    type Error = WindowsError;
+    type PlatformConfig = WindowsConfig;
 
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        self.0.fmt(f)
-    }
-}
-
-impl std::error::Error for Error {}
-
-impl From<WindowsError> for Error {
-    fn from(other: WindowsError) -> Error {
-        Error(other)
-    }
-}
-
-impl Windows {
-    /// Create media controls with the specified config.
-    pub fn new(config: PlatformConfig) -> Result<Self, Error> {
+    fn new(config: Self::PlatformConfig) -> Result<Self, Self::Error> {
         let interop: ISystemMediaTransportControlsInterop = windows::core::factory::<
             SystemMediaTransportControls,
             ISystemMediaTransportControlsInterop,
         >()?;
-        let hwnd = config
-            .hwnd
-            .expect("Windows media controls require an HWND in PlatformConfig.");
-
         let controls: SystemMediaTransportControls =
-            unsafe { interop.GetForWindow(HWND(hwnd as isize)) }?;
+            unsafe { interop.GetForWindow(HWND(config.hwnd as isize)) }?;
         let display_updater = controls.DisplayUpdater()?;
         let timeline_properties = SystemMediaTransportControlsTimelineProperties::new()?;
 
@@ -77,8 +60,7 @@ impl Windows {
         })
     }
 
-    /// Attach the media control events to a handler.
-    pub fn attach<F>(&mut self, event_handler: F) -> Result<(), Error>
+    fn attach<F>(&mut self, event_handler: F) -> Result<(), Self::Error>
     where
         F: Fn(MediaControlEvent) + Send + 'static,
     {
@@ -146,8 +128,7 @@ impl Windows {
         Ok(())
     }
 
-    /// Detach the event handler.
-    pub fn detach(&mut self) -> Result<(), Error> {
+    fn detach(&mut self) -> Result<(), Self::Error> {
         self.controls.SetIsEnabled(false)?;
         if let Some(button_handler_token) = self.button_handler_token {
             self.controls.RemoveButtonPressed(button_handler_token)?;
@@ -155,8 +136,7 @@ impl Windows {
         Ok(())
     }
 
-    /// Set the current playback status.
-    pub fn set_playback(&mut self, playback: MediaPlayback) -> Result<(), Error> {
+    fn set_playback(&mut self, playback: MediaPlayback) -> Result<(), Self::Error> {
         let status = match playback {
             MediaPlayback::Playing { .. } => SmtcPlayback::Playing as i32,
             MediaPlayback::Paused { .. } => SmtcPlayback::Paused as i32,
@@ -181,8 +161,7 @@ impl Windows {
         Ok(())
     }
 
-    /// Set the metadata of the currently playing media item.
-    pub fn set_metadata(&mut self, metadata: MediaMetadata) -> Result<(), Error> {
+    fn set_metadata(&mut self, metadata: MediaMetadata) -> Result<(), Self::Error> {
         let properties = self.display_updater.MusicProperties()?;
 
         if let Some(title) = metadata.title {
@@ -191,24 +170,25 @@ impl Windows {
         if let Some(artist) = metadata.artist {
             properties.SetArtist(&HSTRING::from(artist))?;
         }
-        if let Some(album) = metadata.album {
-            properties.SetAlbumTitle(&HSTRING::from(album))?;
+        if let Some(album_title) = metadata.album_title {
+            properties.SetAlbumTitle(&HSTRING::from(album_title))?;
         }
-        if let Some(url) = metadata.cover_url {
-            let stream = if url.starts_with("file://") {
-                // url is a file, load it manually
-                let path = url.trim_start_matches("file://");
-                let loader =
-                    windows::Storage::StorageFile::GetFileFromPathAsync(&HSTRING::from(path))?;
-                let results = loader.get()?;
-                loader.Close()?;
+        // TODO:
+        // if let Some(url) = metadata.cover_url {
+        //     let stream = if url.starts_with("file://") {
+        //         // url is a file, load it manually
+        //         let path = url.trim_start_matches("file://");
+        //         let loader =
+        //             windows::Storage::StorageFile::GetFileFromPathAsync(&HSTRING::from(path))?;
+        //         let results = loader.get()?;
+        //         loader.Close()?;
 
-                RandomAccessStreamReference::CreateFromFile(&results)?
-            } else {
-                RandomAccessStreamReference::CreateFromUri(&Uri::CreateUri(&HSTRING::from(url))?)?
-            };
-            self.display_updater.SetThumbnail(&stream)?;
-        }
+        //         RandomAccessStreamReference::CreateFromFile(&results)?
+        //     } else {
+        //         RandomAccessStreamReference::CreateFromUri(&Uri::CreateUri(&HSTRING::from(url))?)?
+        //     };
+        //     self.display_updater.SetThumbnail(&stream)?;
+        // }
         let duration = metadata.duration.unwrap_or_default();
         self.timeline_properties.SetStartTime(TimeSpan::default())?;
         self.timeline_properties

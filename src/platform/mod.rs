@@ -12,7 +12,7 @@ pub use macos::{Macos as OsImpl, MacosError as OsError};
 #[cfg(platform_windows)]
 pub mod windows;
 #[cfg(platform_windows)]
-pub use windows::{Windows as OsImpl, WindowsError as OsError};
+pub use self::windows::{Windows as OsImpl, WindowsError as OsError};
 
 /// Dummy platform in case is not supported. All media control operations are simply no-ops.
 #[cfg(not(any(platform_mpris, platform_macos, platform_windows)))]
