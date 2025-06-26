@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::convert::From;
 use std::convert::TryFrom;
 use std::convert::TryInto;
@@ -6,13 +5,15 @@ use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 use zbus::{dbus_interface, ConnectionBuilder, SignalContext};
-use zvariant::{ObjectPath, Value};
 
-use super::insert_if_some;
+use zvariant::ObjectPath;
+
+use super::create_metadata_dict;
 use super::InternalEvent;
 use super::MprisError;
 use super::ServiceState;
 use super::ServiceThreadHandle;
+use crate::platform::mpris::MetadataDict;
 use crate::Loop;
 use crate::{
     MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig,
@@ -65,7 +66,6 @@ impl MediaControls for Zbus {
 
         let dbus_name = self.dbus_name.clone();
         let friendly_name = self.friendly_name.clone();
-        let event_handler = Arc::new(Mutex::new(event_handler));
         let (event_channel, rx) = mpsc::channel();
 
         self.thread = Some(ServiceThreadHandle {
@@ -257,74 +257,8 @@ impl PlayerInterface {
     }
 
     #[dbus_interface(property)]
-    fn metadata(&self) -> HashMap<&str, Value> {
-        // TODO: this should be stored in a cache inside the state.
-        let mut dict = HashMap::<&str, Value>::new();
-
-        let MediaMetadata {
-            ref title,
-            ref album_title,
-            ref artists,
-            ref album_artists,
-            ref genres,
-            track_number,
-            disc_number,
-            ref composers,
-            ref lyricists,
-            ref lyrics,
-            ref comments,
-            beats_per_minute,
-            user_rating_01,
-            auto_rating,
-            play_count,
-            ref media_url,
-            duration,
-            ..
-        } = self.state.metadata;
-
-        // TODO: Workaround to enable SetPosition.
-        dict.insert(
-            "mpris:trackid",
-            Value::new(ObjectPath::try_from("/").unwrap()),
-        );
-
-        #[rustfmt::skip]
-        insert_if_some!(|k, v| dict.insert(k, v), Value,
-            // Cover URL missing here
-            // "mpris:artUrl", ...,
-            "xesam:title", title,
-            "xesam:artist", artists,
-            "xesam:album", album_title,
-            "xesam:albumArtist", album_artists,
-            "xesam:genre", genres,
-            "xesam:composer", composers,
-            "xesam:lyricist", lyricists,
-            "xesam:asText", lyrics,
-            "xesam:comment", comments,
-            "xesam:url", media_url,
-        );
-        #[rustfmt::skip]
-        insert_if_some!(|k, v| dict.insert(k, v), Value, no_clone,
-            "mpris:length", duration.map(|length| i64::try_from(length.as_micros()).unwrap()),
-            "xesam:trackNumber", track_number,
-            "xesam:discNumber", disc_number,
-            "xesam:audioBPM", beats_per_minute,
-            "xesam:userRating", user_rating_01,
-            "xesam:autoRating", auto_rating,
-            "xesam:playCount", play_count,
-        );
-
-        #[cfg(feature = "date")]
-        {
-            let &MediaMetadata {
-                ref content_created,
-                ref first_played,
-                ref last_played,
-            } = metadata;
-            // TODO: handle date types
-            todo!();
-        }
-        dict
+    fn metadata(&self) -> MetadataDict {
+        self.state.metadata_dict.clone()
     }
 
     #[dbus_interface(property)]
@@ -393,33 +327,28 @@ impl PlayerInterface {
     }
 }
 
-async fn run_service(
+async fn run_service<F>(
     dbus_name: String,
     friendly_name: String,
-    event_handler: Arc<Mutex<dyn Fn(MediaControlEvent) + Send + 'static>>,
+    event_handler: F,
     event_channel: mpsc::Receiver<InternalEvent>,
-) -> zbus::Result<()> {
+) -> Result<(), MprisError>
+where
+    F: Fn(MediaControlEvent) + Send + 'static,
+{
+    let event_handler = Arc::new(Mutex::new(event_handler));
     let app = AppInterface {
         friendly_name,
         event_handler: event_handler.clone(),
     };
 
     let player = PlayerInterface {
-        state: ServiceState {
-            playback_status: MediaPlayback::Stopped,
-            loop_status: Loop::None,
-            rate: 1.0,
-            shuffle: false,
-            metadata: Default::default(),
-            volume: 1.0,
-            maximum_rate: 1.0,
-            minimum_rate: 1.0,
-        },
+        state: ServiceState::default(),
         event_handler,
     };
 
     let name = format!("org.mpris.MediaPlayer2.{dbus_name}");
-    let path = ObjectPath::try_from("/org/mpris/MediaPlayer2")?;
+    let path = ObjectPath::try_from("/org/mpris/MediaPlayer2").unwrap();
     let connection = ConnectionBuilder::session()?
         .serve_at(&path, app)?
         .serve_at(&path, player)?
@@ -428,7 +357,7 @@ async fn run_service(
         .await?;
 
     loop {
-        if let Ok(event) = event_channel.recv_timeout(Duration::from_millis(10)) {
+        while let Ok(event) = event_channel.recv_timeout(Duration::from_millis(10)) {
             let interface_ref = connection
                 .object_server()
                 .interface::<_, PlayerInterface>(&path)
@@ -438,6 +367,7 @@ async fn run_service(
 
             match event {
                 InternalEvent::SetMetadata(metadata) => {
+                    interface.state.metadata_dict = create_metadata_dict(&metadata);
                     interface.state.metadata = metadata;
                     interface.metadata_changed(&ctxt).await?;
                 }
@@ -449,13 +379,17 @@ async fn run_service(
                     interface.state.loop_status = loop_status;
                     interface.loop_status_changed(&ctxt).await?;
                 }
-                InternalEvent::SetVolume(volume) => {
-                    interface.state.volume = volume;
-                    interface.volume_changed(&ctxt).await?;
-                }
                 InternalEvent::SetRate(rate) => {
                     interface.state.rate = rate;
                     interface.rate_changed(&ctxt).await?;
+                }
+                InternalEvent::SetShuffle(shuffle) => {
+                    interface.state.shuffle = shuffle;
+                    interface.shuffle_changed(&ctxt).await?;
+                }
+                InternalEvent::SetVolume(volume) => {
+                    interface.state.volume = volume;
+                    interface.volume_changed(&ctxt).await?;
                 }
                 InternalEvent::SetMaximumRate(rate) => {
                     interface.state.maximum_rate = rate;
@@ -465,14 +399,8 @@ async fn run_service(
                     interface.state.minimum_rate = rate;
                     interface.minimum_rate_changed(&ctxt).await?;
                 }
-                InternalEvent::SetShuffle(shuffle) => {
-                    interface.state.shuffle = shuffle;
-                    interface.shuffle_changed(&ctxt).await?;
-                }
-                InternalEvent::Kill => break,
+                InternalEvent::Kill => return Ok(()),
             }
         }
     }
-
-    Ok(())
 }

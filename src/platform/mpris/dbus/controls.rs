@@ -6,14 +6,14 @@ use dbus::message::SignalArgs;
 use dbus::Path;
 
 use std::collections::HashMap;
-use std::convert::TryFrom;
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use super::super::insert_if_some;
-use super::super::{InternalEvent, MprisError, ServiceState, ServiceThreadHandle};
-use crate::{Loop, MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, PlatformConfig};
+use super::super::{
+    create_metadata_dict, InternalEvent, MprisError, ServiceState, ServiceThreadHandle,
+};
+use crate::{MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, PlatformConfig};
 
 /// A handle to OS media controls.
 pub struct Dbus {
@@ -97,75 +97,6 @@ impl MediaControls for Dbus {
         self.send_internal_event(InternalEvent::SetMetadata(metadata))
     }
 }
-//
-// TODO: This can be refactored to use macros
-pub fn create_metadata_dict(metadata: &MediaMetadata) -> HashMap<String, Variant<Box<dyn RefArg>>> {
-    let mut dict = HashMap::<String, Variant<Box<dyn RefArg>>>::new();
-
-    let mut insert = |k: &str, v| dict.insert(k.to_string(), Variant(v));
-
-    let &MediaMetadata {
-        ref title,
-        ref album_title,
-        ref artists,
-        ref album_artists,
-        ref genres,
-        track_number,
-        disc_number,
-        ref composers,
-        ref lyricists,
-        ref lyrics,
-        ref comments,
-        beats_per_minute,
-        user_rating_01,
-        auto_rating,
-        play_count,
-        ref media_url,
-        duration,
-        ..
-    } = metadata;
-
-    // TODO: Workaround to enable SetPosition.
-    insert("mpris:trackid", Box::new(Path::new("/").unwrap()));
-
-    #[rustfmt::skip]
-    insert_if_some!(insert, Box,
-        // Cover URL missing here
-        // "mpris:artUrl", ...,
-        "xesam:title", title,
-        "xesam:artist", artists,
-        "xesam:album", album_title,
-        "xesam:albumArtist", album_artists,
-        "xesam:genre", genres,
-        "xesam:composer", composers,
-        "xesam:lyricist", lyricists,
-        "xesam:asText", lyrics,
-        "xesam:comment", comments,
-        "xesam:url", media_url,
-    );
-    #[rustfmt::skip]
-    insert_if_some!(insert, Box, no_clone,
-        "mpris:length", duration.map(|length| i64::try_from(length.as_micros()).unwrap()),
-        "xesam:trackNumber", track_number,
-        "xesam:discNumber", disc_number,
-        "xesam:audioBPM", beats_per_minute,
-        "xesam:userRating", user_rating_01,
-        "xesam:autoRating", auto_rating,
-        "xesam:playCount", play_count,
-    );
-
-    #[cfg(feature = "date")]
-    {
-        let &MediaMetadata {
-            ref content_created,
-            ref first_played,
-            ref last_played,
-        } = metadata;
-        // TODO: handle date types
-        todo!();
-    }
-    dict
-}
 
 fn run_service<F>(
     conn: Connection,
@@ -176,17 +107,7 @@ fn run_service<F>(
 where
     F: Fn(MediaControlEvent) + Send + 'static,
 {
-    let state = Arc::new(Mutex::new(ServiceState {
-        playback_status: MediaPlayback::Stopped,
-        loop_status: Loop::None,
-        rate: 1.0,
-        shuffle: false,
-        metadata: Default::default(),
-        metadata_dict: create_metadata_dict(&Default::default()),
-        volume: 1.0,
-        maximum_rate: 1.0,
-        minimum_rate: 1.0,
-    }));
+    let state = Arc::new(Mutex::new(ServiceState::default()));
     let event_handler = Arc::new(Mutex::new(event_handler));
     let seeked_signal = Arc::new(Mutex::new(None));
 
@@ -202,7 +123,7 @@ where
     );
 
     loop {
-        if let Ok(event) = event_channel.recv_timeout(Duration::from_millis(10)) {
+        while let Ok(event) = event_channel.recv_timeout(Duration::from_millis(10)) {
             let mut changed_properties = HashMap::new();
 
             match event {
@@ -256,7 +177,7 @@ where
                     state.minimum_rate = rate;
                     changed_properties.insert("MinimumRate".to_owned(), Variant(Box::new(rate)));
                 }
-                InternalEvent::Kill => break,
+                InternalEvent::Kill => return Ok(()),
             }
 
             let properties_changed = PropertiesPropertiesChanged {
@@ -273,6 +194,4 @@ where
         // NOTE: Arbitrary timeout duration...
         conn.process(Duration::from_millis(10))?;
     }
-
-    Ok(())
 }

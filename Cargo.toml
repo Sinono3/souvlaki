@@ -10,7 +10,7 @@ license = "MIT"
 rust-version = "1.67"
 
 [features]
-default = ["use_zbus"]
+default = ["use_dbus"]
 use_dbus = ["dbus", "dbus-crossroads"]
 use_zbus = ["zbus", "zvariant", "pollster"]
 date = ["time"]
