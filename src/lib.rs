@@ -19,7 +19,7 @@ pub use metadata::*;
 
 pub type OsMediaControls = controls::MediaControlsWrapper<crate::platform::OsImpl>;
 
-/// Events sent by the OS media controls.
+/// Events caused by the user interacting with the OS media controls.
 #[derive(Clone, PartialEq, Debug)]
 pub enum MediaControlEvent {
     Play,
@@ -54,9 +54,9 @@ pub enum MediaControlEvent {
     SetShuffle(bool),
     /// Set loop status of the media item: (none, loop track, loop playlist)
     /// **NOTE**: If the event was received and correctly handled,
-    /// [`MediaControls::set_shuffle`] must be called. Note that
+    /// [`MediaControls::set_loop`] must be called. Note that
     /// this must be done only with the MPRIS backend.
-    SetLoopStatus(LoopStatus),
+    SetLoop(Loop),
 
     /// Open the URI in the media player.
     OpenUri(String),
@@ -90,7 +90,7 @@ impl MediaPlayback {
 
 /// A repeat/loop status
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum LoopStatus {
+pub enum Loop {
     /// - **MPRIS**: The playback will stop when there are no more tracks to play
     None,
     /// - **MPRIS**: The current track will start again from the begining once it has finished playing
@@ -99,9 +99,9 @@ pub enum LoopStatus {
     Playlist,
 }
 
-impl LoopStatus {
+impl Loop {
     pub fn to_dbus_value(self) -> &'static str {
-        use LoopStatus::*;
+        use Loop::*;
         match self {
             None => "None",
             Track => "Track",
@@ -109,7 +109,7 @@ impl LoopStatus {
         }
     }
     pub fn from_dbus_value(x: &str) -> Option<Self> {
-        use LoopStatus::*;
+        use Loop::*;
         match x {
             "None" => Some(None),
             "Track" => Some(Track),

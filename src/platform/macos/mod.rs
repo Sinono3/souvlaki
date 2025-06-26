@@ -47,12 +47,10 @@ pub type OsImpl = Macos;
 impl MediaControls for Macos {
     type Error = MacosError;
 
-    /// Create media controls with the specified config.
     fn new(_config: PlatformConfig) -> Result<Self, MacosError> {
         Ok(Self)
     }
 
-    /// Attach the media control events to a handler.
     fn attach<F>(&mut self, event_handler: F) -> Result<(), MacosError>
     where
         F: Fn(MediaControlEvent) + Send + 'static,
@@ -61,19 +59,16 @@ impl MediaControls for Macos {
         Ok(())
     }
 
-    /// Detach the event handler.
     fn detach(&mut self) -> Result<(), MacosError> {
         unsafe { detach_command_handlers() };
         Ok(())
     }
 
-    /// Set the current playback status.
     fn set_playback(&mut self, playback: MediaPlayback) -> Result<(), MacosError> {
         unsafe { set_playback_status(playback) };
         Ok(())
     }
 
-    /// Set the metadata of the currently playing media item.
     fn set_metadata(&mut self, metadata: MediaMetadata) -> Result<(), MacosError> {
         unsafe { set_playback_metadata(metadata) };
         Ok(())
@@ -217,6 +212,19 @@ unsafe fn attach_command_handlers(handler: Arc<dyn Fn(MediaControlEvent)>) {
     let _: () = msg_send!(cmd, setEnabled: YES);
     let _: () = msg_send!(cmd, addTargetWithHandler: pause_handler);
 
+    // stopCommand
+    let stop_handler = ConcreteBlock::new({
+        let handler = handler.clone();
+        move |_event: id| -> NSInteger {
+            (handler)(MediaControlEvent::Stop);
+            MPRemoteCommandHandlerStatusSuccess
+        }
+    })
+    .copy();
+    let cmd: id = msg_send!(command_center, stopCommand);
+    let _: () = msg_send!(cmd, setEnabled: YES);
+    let _: () = msg_send!(cmd, addTargetWithHandler: stop_handler);
+
     // previousTrackCommand
     let previous_track_handler = ConcreteBlock::new({
         let handler = handler.clone();
@@ -273,6 +281,10 @@ unsafe fn detach_command_handlers() {
     let _: () = msg_send!(cmd, removeTarget: nil);
 
     let cmd: id = msg_send!(command_center, pauseCommand);
+    let _: () = msg_send!(cmd, setEnabled: NO);
+    let _: () = msg_send!(cmd, removeTarget: nil);
+
+    let cmd: id = msg_send!(command_center, stopCommand);
     let _: () = msg_send!(cmd, setEnabled: NO);
     let _: () = msg_send!(cmd, removeTarget: nil);
 

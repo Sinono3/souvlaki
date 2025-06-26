@@ -1,6 +1,6 @@
 use std::{sync::mpsc, thread::sleep, time::Duration};
 
-use souvlaki::{MediaControlEvent, MediaMetadata, MediaPlayback, OsMediaControls, PlatformConfig};
+use souvlaki::{MediaControlEvent, MediaPlayback, OsMediaControls, PlatformConfig};
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -11,6 +11,8 @@ struct TestApp {
     playing: bool,
     song_index: u8,
 }
+
+mod sample_data;
 
 fn main() {
     let event_loop = EventLoop::new();
@@ -49,16 +51,7 @@ fn main() {
     controls
         .set_playback(MediaPlayback::Playing { progress: None })
         .unwrap();
-    controls
-        .set_metadata(MediaMetadata {
-            title: Some("When The Sun Hits".to_owned()),
-            album_title: Some("Souvlaki".to_owned()),
-            artist: Some("Slowdive".to_owned()),
-            duration: Some(Duration::from_secs_f64(4.0 * 60.0 + 50.0)),
-            // cover_url: Some("https://c.pxhere.com/photos/34/c1/souvlaki_authentic_greek_greek_food_mezes-497780.jpg!d"),
-            ..Default::default()
-        })
-        .unwrap();
+    controls.set_metadata(sample_data::metadata()).unwrap();
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
@@ -85,7 +78,7 @@ fn main() {
                     }
                     change = true;
                 }
-                sleep(Duration::from_millis(50));
+                sleep(Duration::from_millis(1));
 
                 if change {
                     controls

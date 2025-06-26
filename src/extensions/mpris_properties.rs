@@ -1,11 +1,11 @@
-use crate::{LoopStatus, MediaControls};
+use crate::{Loop, MediaControls};
 
 /// Allows setting additional MPRIS properties to reflect the
 /// current state of the media player, e.g. volume, minimum rate,
 /// maximum rate, playback rate
 pub trait MprisPropertiesExt: MediaControls {
     /// Set the loop/repeat status (none, track, playlist)
-    fn set_loop_status(&mut self, loop_status: LoopStatus) -> Result<(), Self::Error>;
+    fn set_loop_status(&mut self, loop_status: Loop) -> Result<(), Self::Error>;
     /// Set the playback rate, e.g. 0.5x, 1.0x, 2.0x
     fn set_rate(&mut self, rate: f64) -> Result<(), Self::Error>;
     /// As in the MPRIS2 specification:

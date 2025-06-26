@@ -12,6 +12,7 @@ pub enum MediaCover {
     #[cfg(any(platform_mpris, platform_macos, platform_windows))]
     DataUrl(String),
     /// Supported in MPRIS, macOS/iOS, Windows.
+    // NOTE: the `platform_apple` instead of the `platform_macos`
     #[cfg(any(platform_mpris, platform_apple, platform_windows))]
     LocalFile(PathBuf),
     /// Supported in macOS, Windows.

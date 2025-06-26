@@ -7,16 +7,17 @@ use std::{
 use dbus::Path;
 use dbus_crossroads::{Crossroads, IfaceBuilder};
 
-use crate::{LoopStatus, MediaControlEvent, MediaPlayback, MediaPosition, SeekDirection};
+use crate::{Loop, MediaControlEvent, MediaPlayback, MediaPosition, SeekDirection};
 
-use super::controls::{create_metadata_dict, ServiceState};
+use super::super::ServiceState;
+use super::controls::create_metadata_dict;
 
 // TODO: This type is super messed up, but it's the only way to get seeking working properly
 // on graphical media controls using dbus-crossroads.
 pub type SeekedSignal =
     Arc<Mutex<Option<Box<dyn Fn(&Path<'_>, &(String,)) -> dbus::Message + Send + Sync>>>>;
 
-pub fn register_methods<F>(
+pub(super) fn register_methods<F>(
     state: &Arc<Mutex<ServiceState>>,
     event_handler: &Arc<Mutex<F>>,
     friendly_name: String,
@@ -147,11 +148,11 @@ where
             .set({
                 let event_handler = event_handler.clone();
                 move |_, _, loop_status_dbus: String| {
-                    let Some(loop_status) = LoopStatus::from_dbus_value(&loop_status_dbus) else {
+                    let Some(loop_status) = Loop::from_dbus_value(&loop_status_dbus) else {
                         // If invalid, just ignore it
                         return Ok(None);
                     };
-                    (event_handler.lock().unwrap())(MediaControlEvent::SetLoopStatus(loop_status));
+                    (event_handler.lock().unwrap())(MediaControlEvent::SetLoop(loop_status));
                     Ok(Some(loop_status_dbus))
                 }
             })

@@ -8,6 +8,10 @@ compile_error!("feature \"dbus\" and feature \"zbus\" are mutually exclusive");
 
 #[cfg(feature = "zbus")]
 mod zbus;
+use std::{sync::mpsc, thread::JoinHandle};
+
+use crate::{extensions::MprisPropertiesExt, Loop, MediaMetadata, MediaPlayback};
+
 #[cfg(feature = "zbus")]
 pub use self::zbus::Zbus as Mpris;
 #[cfg(feature = "zbus")]
@@ -38,3 +42,88 @@ pub enum MprisError {
     #[error("D-Bus service thread panicked")]
     ThreadPanicked,
 }
+
+struct ServiceThreadHandle {
+    event_channel: mpsc::Sender<InternalEvent>,
+    thread: JoinHandle<Result<(), MprisError>>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) enum InternalEvent {
+    SetMetadata(MediaMetadata),
+    SetPlayback(MediaPlayback),
+    SetLoopStatus(Loop),
+    SetRate(f64),
+    SetShuffle(bool),
+    SetVolume(f64),
+    SetMaximumRate(f64),
+    SetMinimumRate(f64),
+    Kill,
+}
+
+#[cfg(platform_mpris_dbus)]
+use ::dbus::arg::{RefArg, Variant};
+#[cfg(platform_mpris_dbus)]
+use std::collections::HashMap;
+
+// TODO: This is public only due to how rust modules work...
+// should not actually be seen by the library user
+#[derive(Debug)]
+struct ServiceState {
+    playback_status: MediaPlayback,
+    loop_status: Loop,
+    rate: f64,
+    shuffle: bool,
+    metadata: MediaMetadata,
+    #[cfg(platform_mpris_dbus)]
+    metadata_dict: HashMap<String, Variant<Box<dyn RefArg>>>,
+    volume: f64,
+    maximum_rate: f64,
+    minimum_rate: f64,
+}
+
+impl MprisPropertiesExt for Mpris {
+    fn set_loop_status(&mut self, loop_status: Loop) -> Result<(), Self::Error> {
+        self.send_internal_event(InternalEvent::SetLoopStatus(loop_status))
+    }
+
+    fn set_rate(&mut self, rate: f64) -> Result<(), Self::Error> {
+        self.send_internal_event(InternalEvent::SetRate(rate))
+    }
+
+    fn set_shuffle(&mut self, shuffle: bool) -> Result<(), Self::Error> {
+        self.send_internal_event(InternalEvent::SetShuffle(shuffle))
+    }
+
+    fn set_volume(&mut self, volume: f64) -> Result<(), Self::Error> {
+        self.send_internal_event(InternalEvent::SetVolume(volume))
+    }
+
+    fn set_maximum_rate(&mut self, rate: f64) -> Result<(), Self::Error> {
+        self.send_internal_event(InternalEvent::SetMaximumRate(rate))
+    }
+
+    fn set_minimum_rate(&mut self, rate: f64) -> Result<(), Self::Error> {
+        self.send_internal_event(InternalEvent::SetMinimumRate(rate))
+    }
+}
+
+// Macro for constructing metadata fields
+macro_rules! insert_if_some {
+    ($insert:expr, $wrapper:ident, $($key:literal, $value:expr),* $(,)?) => {
+        $(
+            if let Some(value) = $value {
+                ($insert)($key, $wrapper::new(value.clone()));
+            }
+        )*
+    };
+    // Variant for values that don't need cloning
+    ($insert:expr, $wrapper:ident, no_clone, $($key:literal, $value:expr),* $(,)?) => {
+        $(
+            if let Some(value) = $value {
+                ($insert)($key, $wrapper::new(value));
+            }
+        )*
+    };
+}
+pub(self) use insert_if_some;

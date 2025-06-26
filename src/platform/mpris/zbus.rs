@@ -3,20 +3,21 @@ use std::convert::From;
 use std::convert::TryFrom;
 use std::convert::TryInto;
 use std::sync::{mpsc, Arc, Mutex};
-use std::thread::{self, JoinHandle};
+use std::thread;
 use std::time::Duration;
-
 use zbus::{dbus_interface, ConnectionBuilder, SignalContext};
 use zvariant::{ObjectPath, Value};
 
-use crate::extensions::MprisPropertiesExt;
-use crate::LoopStatus;
+use super::insert_if_some;
+use super::InternalEvent;
+use super::MprisError;
+use super::ServiceState;
+use super::ServiceThreadHandle;
+use crate::Loop;
 use crate::{
     MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig,
     SeekDirection,
 };
-
-use super::MprisError;
 
 /// A handle to OS media controls.
 pub struct Zbus {
@@ -25,34 +26,18 @@ pub struct Zbus {
     friendly_name: String,
 }
 
-struct ServiceThreadHandle {
-    event_channel: mpsc::Sender<InternalEvent>,
-    thread: JoinHandle<Result<(), MprisError>>,
-}
-
-#[derive(Clone, Debug)]
-enum InternalEvent {
-    SetMetadata(MediaMetadata),
-    SetPlayback(MediaPlayback),
-    SetLoopStatus(LoopStatus),
-    SetRate(f64),
-    SetShuffle(bool),
-    SetVolume(f64),
-    SetMaximumRate(f64),
-    SetMinimumRate(f64),
-    Kill,
-}
-
-#[derive(Debug)]
-pub struct ServiceState {
-    pub playback_status: MediaPlayback,
-    pub loop_status: LoopStatus,
-    pub rate: f64,
-    pub shuffle: bool,
-    pub metadata: MediaMetadata,
-    pub volume: f64,
-    pub maximum_rate: f64,
-    pub minimum_rate: f64,
+impl Zbus {
+    pub(in super::super) fn send_internal_event(
+        &mut self,
+        event: InternalEvent,
+    ) -> Result<(), MprisError> {
+        let channel = &self
+            .thread
+            .as_ref()
+            .ok_or(MprisError::ThreadNotRunning)?
+            .event_channel;
+        channel.send(event).map_err(|_| MprisError::ThreadPanicked)
+    }
 }
 
 impl MediaControls for Zbus {
@@ -111,44 +96,6 @@ impl MediaControls for Zbus {
 
     fn set_metadata(&mut self, metadata: MediaMetadata) -> Result<(), Self::Error> {
         self.send_internal_event(InternalEvent::SetMetadata(metadata.into()))
-    }
-}
-
-impl Zbus {
-    fn send_internal_event(&mut self, event: InternalEvent) -> Result<(), MprisError> {
-        let channel = &self
-            .thread
-            .as_ref()
-            .ok_or(MprisError::ThreadNotRunning)?
-            .event_channel;
-        channel.send(event).map_err(|_| MprisError::ThreadPanicked)
-    }
-}
-
-// TODO: move to extension trait
-impl MprisPropertiesExt for Zbus {
-    fn set_loop_status(&mut self, loop_status: LoopStatus) -> Result<(), Self::Error> {
-        self.send_internal_event(InternalEvent::SetLoopStatus(loop_status))
-    }
-
-    fn set_rate(&mut self, rate: f64) -> Result<(), Self::Error> {
-        self.send_internal_event(InternalEvent::SetRate(rate))
-    }
-
-    fn set_shuffle(&mut self, shuffle: bool) -> Result<(), Self::Error> {
-        self.send_internal_event(InternalEvent::SetShuffle(shuffle))
-    }
-
-    fn set_volume(&mut self, volume: f64) -> Result<(), Self::Error> {
-        self.send_internal_event(InternalEvent::SetVolume(volume))
-    }
-
-    fn set_maximum_rate(&mut self, rate: f64) -> Result<(), Self::Error> {
-        self.send_internal_event(InternalEvent::SetMaximumRate(rate))
-    }
-
-    fn set_minimum_rate(&mut self, rate: f64) -> Result<(), Self::Error> {
-        self.send_internal_event(InternalEvent::SetMinimumRate(rate))
     }
 }
 
@@ -284,8 +231,8 @@ impl PlayerInterface {
 
     #[dbus_interface(property)]
     fn set_loop_status(&self, loop_status: &str) {
-        if let Some(loop_status) = LoopStatus::from_dbus_value(loop_status) {
-            self.send_event(MediaControlEvent::SetLoopStatus(loop_status));
+        if let Some(loop_status) = Loop::from_dbus_value(loop_status) {
+            self.send_event(MediaControlEvent::SetLoop(loop_status));
         }
     }
 
@@ -335,74 +282,37 @@ impl PlayerInterface {
             ..
         } = self.state.metadata;
 
-        // MPRIS
+        // TODO: Workaround to enable SetPosition.
         dict.insert(
             "mpris:trackid",
-            // TODO: this is just a workaround to enable SetPosition.
             Value::new(ObjectPath::try_from("/").unwrap()),
         );
 
-        if let Some(length) = duration {
-            dict.insert(
-                "mpris:length",
-                Value::new(i64::try_from(length.as_micros()).unwrap()),
-            );
-        }
-
-        // TODO
-        // if let Some(cover_url) = cover_url {
-        //     dict.insert("mpris:artUrl", Value::new(cover_url.clone()));
-        // }
-
-        // Xesam
-        if let Some(title) = title {
-            dict.insert("xesam:title", Value::new(title.clone()));
-        }
-        if let Some(artists) = artists {
-            dict.insert("xesam:artist", Value::new(artists.clone()));
-        }
-        if let Some(album_title) = album_title {
-            dict.insert("xesam:album", Value::new(album_title.clone()));
-        }
-        if let Some(album_artists) = album_artists {
-            dict.insert("xesam:albumArtist", Value::new(album_artists.clone()));
-        }
-        if let Some(genres) = genres {
-            dict.insert("xesam:genre", Value::new(genres.clone()));
-        }
-        if let Some(track_number) = track_number {
-            dict.insert("xesam:trackNumber", Value::new(track_number));
-        }
-        if let Some(disc_number) = disc_number {
-            dict.insert("xesam:discNumber", Value::new(disc_number));
-        }
-        if let Some(composers) = composers {
-            dict.insert("xesam:composer", Value::new(composers.clone()));
-        }
-        if let Some(lyricists) = lyricists {
-            dict.insert("xesam:lyricist", Value::new(lyricists.clone()));
-        }
-        if let Some(lyrics) = lyrics {
-            dict.insert("xesam:asText", Value::new(lyrics.clone()));
-        }
-        if let Some(comments) = comments {
-            dict.insert("xesam:comment", Value::new(comments.clone()));
-        }
-        if let Some(beats_per_minute) = beats_per_minute {
-            dict.insert("xesam:audioBPM", Value::new(beats_per_minute));
-        }
-        if let Some(user_rating_01) = user_rating_01 {
-            dict.insert("xesam:userRating", Value::new(user_rating_01));
-        }
-        if let Some(auto_rating) = auto_rating {
-            dict.insert("xesam:autoRating", Value::new(auto_rating));
-        }
-        if let Some(play_count) = play_count {
-            dict.insert("xesam:playCount", Value::new(play_count));
-        }
-        if let Some(media_url) = media_url {
-            dict.insert("xesam:url", Value::new(media_url.clone()));
-        }
+        #[rustfmt::skip]
+        insert_if_some!(|k, v| dict.insert(k, v), Value,
+            // Cover URL missing here
+            // "mpris:artUrl", ...,
+            "xesam:title", title,
+            "xesam:artist", artists,
+            "xesam:album", album_title,
+            "xesam:albumArtist", album_artists,
+            "xesam:genre", genres,
+            "xesam:composer", composers,
+            "xesam:lyricist", lyricists,
+            "xesam:asText", lyrics,
+            "xesam:comment", comments,
+            "xesam:url", media_url,
+        );
+        #[rustfmt::skip]
+        insert_if_some!(|k, v| dict.insert(k, v), Value, no_clone,
+            "mpris:length", duration.map(|length| i64::try_from(length.as_micros()).unwrap()),
+            "xesam:trackNumber", track_number,
+            "xesam:discNumber", disc_number,
+            "xesam:audioBPM", beats_per_minute,
+            "xesam:userRating", user_rating_01,
+            "xesam:autoRating", auto_rating,
+            "xesam:playCount", play_count,
+        );
 
         #[cfg(feature = "date")]
         {
@@ -497,7 +407,7 @@ async fn run_service(
     let player = PlayerInterface {
         state: ServiceState {
             playback_status: MediaPlayback::Stopped,
-            loop_status: LoopStatus::None,
+            loop_status: Loop::None,
             rate: 1.0,
             shuffle: false,
             metadata: Default::default(),

@@ -4,17 +4,16 @@ use dbus::channel::{MatchingReceiver, Sender};
 use dbus::ffidisp::stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged;
 use dbus::message::SignalArgs;
 use dbus::Path;
+
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::sync::{mpsc, Arc, Mutex};
-use std::thread::{self, JoinHandle};
+use std::thread;
 use std::time::Duration;
 
-use super::super::MprisError;
-use crate::extensions::MprisPropertiesExt;
-use crate::{
-    LoopStatus, MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, PlatformConfig,
-};
+use super::super::insert_if_some;
+use super::super::{InternalEvent, MprisError, ServiceState, ServiceThreadHandle};
+use crate::{Loop, MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, PlatformConfig};
 
 /// A handle to OS media controls.
 pub struct Dbus {
@@ -23,143 +22,18 @@ pub struct Dbus {
     friendly_name: String,
 }
 
-struct ServiceThreadHandle {
-    event_channel: mpsc::Sender<InternalEvent>,
-    thread: JoinHandle<Result<(), MprisError>>,
+impl Dbus {
+    pub(in super::super) fn send_internal_event(
+        &mut self,
+        event: InternalEvent,
+    ) -> Result<(), MprisError> {
+        let thread = &self.thread.as_ref().ok_or(MprisError::ThreadNotRunning)?;
+        thread
+            .event_channel
+            .send(event)
+            .map_err(|_| MprisError::ThreadPanicked)
+    }
 }
-
-#[derive(Clone, Debug)]
-enum InternalEvent {
-    SetMetadata(MediaMetadata),
-    SetPlayback(MediaPlayback),
-    SetLoopStatus(LoopStatus),
-    SetRate(f64),
-    SetShuffle(bool),
-    SetVolume(f64),
-    SetMaximumRate(f64),
-    SetMinimumRate(f64),
-    Kill,
-}
-
-#[derive(Debug)]
-pub struct ServiceState {
-    pub playback_status: MediaPlayback,
-    pub loop_status: LoopStatus,
-    pub rate: f64,
-    pub shuffle: bool,
-    pub metadata: MediaMetadata,
-    pub metadata_dict: HashMap<String, Variant<Box<dyn RefArg>>>,
-    pub volume: f64,
-    pub maximum_rate: f64,
-    pub minimum_rate: f64,
-}
-
-// TODO: This can be refactored to use macros
-pub fn create_metadata_dict(metadata: &MediaMetadata) -> HashMap<String, Variant<Box<dyn RefArg>>> {
-    let mut dict = HashMap::<String, Variant<Box<dyn RefArg>>>::new();
-
-    let mut insert = |k: &str, v| dict.insert(k.to_string(), Variant(v));
-
-    let &MediaMetadata {
-        ref title,
-        ref album_title,
-        ref artists,
-        ref album_artists,
-        ref genres,
-        track_number,
-        disc_number,
-        ref composers,
-        ref lyricists,
-        ref lyrics,
-        ref comments,
-        beats_per_minute,
-        user_rating_01,
-        auto_rating,
-        play_count,
-        ref media_url,
-        duration,
-        ..
-    } = metadata;
-
-    // MPRIS
-    // TODO: Workaround to enable SetPosition.
-    insert("mpris:trackid", Box::new(Path::new("/").unwrap()));
-
-    if let Some(length) = duration {
-        insert(
-            "mpris:length",
-            Box::new(i64::try_from(length.as_micros()).unwrap()),
-        );
-    }
-
-    // TODO: set cover URL
-    // if let Some(cover_url) = cover_url {
-    //     insert("mpris:artUrl", Box::new(cover_url.clone()));
-    // }
-
-    // Xesam
-    if let Some(title) = title {
-        insert("xesam:title", Box::new(title.clone()));
-    }
-    if let Some(artists) = artists {
-        insert("xesam:artist", Box::new(artists.clone()));
-    }
-    if let Some(album_title) = album_title {
-        insert("xesam:album", Box::new(album_title.clone()));
-    }
-    if let Some(album_artists) = album_artists {
-        insert("xesam:albumArtist", Box::new(album_artists.clone()));
-    }
-    if let Some(genres) = genres {
-        insert("xesam:genre", Box::new(genres.clone()));
-    }
-    if let Some(track_number) = track_number {
-        insert("xesam:trackNumber", Box::new(track_number));
-    }
-    if let Some(disc_number) = disc_number {
-        insert("xesam:discNumber", Box::new(disc_number));
-    }
-    if let Some(composers) = composers {
-        insert("xesam:composer", Box::new(composers.clone()));
-    }
-    if let Some(lyricists) = lyricists {
-        insert("xesam:lyricist", Box::new(lyricists.clone()));
-    }
-    if let Some(lyrics) = lyrics {
-        insert("xesam:asText", Box::new(lyrics.clone()));
-    }
-    if let Some(comments) = comments {
-        insert("xesam:comment", Box::new(comments.clone()));
-    }
-    if let Some(beats_per_minute) = beats_per_minute {
-        insert("xesam:audioBPM", Box::new(beats_per_minute));
-    }
-    if let Some(user_rating_01) = user_rating_01 {
-        insert("xesam:userRating", Box::new(user_rating_01));
-    }
-    if let Some(auto_rating) = auto_rating {
-        insert("xesam:autoRating", Box::new(auto_rating));
-    }
-    if let Some(play_count) = play_count {
-        insert("xesam:playCount", Box::new(play_count));
-    }
-    if let Some(media_url) = media_url {
-        insert("xesam:url", Box::new(media_url.clone()));
-    }
-
-    #[cfg(feature = "date")]
-    {
-        let &MediaMetadata {
-            ref content_created,
-            ref first_played,
-            ref last_played,
-        } = metadata;
-        // TODO: handle date types
-        todo!();
-    }
-    dict
-}
-
 impl MediaControls for Dbus {
     type Error = MprisError;
 
@@ -223,41 +97,74 @@ impl MediaControls for Dbus {
         self.send_internal_event(InternalEvent::SetMetadata(metadata))
     }
 }
+//
+// TODO: This can be refactored to use macros
+pub fn create_metadata_dict(metadata: &MediaMetadata) -> HashMap<String, Variant<Box<dyn RefArg>>> {
+    let mut dict = HashMap::<String, Variant<Box<dyn RefArg>>>::new();
 
-impl Dbus {
-    fn send_internal_event(&mut self, event: InternalEvent) -> Result<(), MprisError> {
-        let thread = &self.thread.as_ref().ok_or(MprisError::ThreadNotRunning)?;
-        thread
-            .event_channel
-            .send(event)
-            .map_err(|_| MprisError::ThreadPanicked)
-    }
-}
+    let mut insert = |k: &str, v| dict.insert(k.to_string(), Variant(v));
 
-impl MprisPropertiesExt for Dbus {
-    fn set_loop_status(&mut self, loop_status: LoopStatus) -> Result<(), Self::Error> {
-        self.send_internal_event(InternalEvent::SetLoopStatus(loop_status))
-    }
+    let &MediaMetadata {
+        ref title,
+        ref album_title,
+        ref artists,
+        ref album_artists,
+        ref genres,
+        track_number,
+        disc_number,
+        ref composers,
+        ref lyricists,
+        ref lyrics,
+        ref comments,
+        beats_per_minute,
+        user_rating_01,
+        auto_rating,
+        play_count,
+        ref media_url,
+        duration,
+        ..
+    } = metadata;
 
-    fn set_rate(&mut self, rate: f64) -> Result<(), Self::Error> {
-        self.send_internal_event(InternalEvent::SetRate(rate))
-    }
+    // TODO: Workaround to enable SetPosition.
+    insert("mpris:trackid", Box::new(Path::new("/").unwrap()));
 
-    fn set_shuffle(&mut self, shuffle: bool) -> Result<(), Self::Error> {
-        self.send_internal_event(InternalEvent::SetShuffle(shuffle))
-    }
+    #[rustfmt::skip]
+    insert_if_some!(insert, Box,
+        // Cover URL missing here
+        // "mpris:artUrl", ...,
+        "xesam:title", title,
+        "xesam:artist", artists,
+        "xesam:album", album_title,
+        "xesam:albumArtist", album_artists,
+        "xesam:genre", genres,
+        "xesam:composer", composers,
+        "xesam:lyricist", lyricists,
+        "xesam:asText", lyrics,
+        "xesam:comment", comments,
+        "xesam:url", media_url,
+    );
+    #[rustfmt::skip]
+    insert_if_some!(insert, Box, no_clone,
+        "mpris:length", duration.map(|length| i64::try_from(length.as_micros()).unwrap()),
+        "xesam:trackNumber", track_number,
+        "xesam:discNumber", disc_number,
+        "xesam:audioBPM", beats_per_minute,
+        "xesam:userRating", user_rating_01,
+        "xesam:autoRating", auto_rating,
+        "xesam:playCount", play_count,
+    );
 
-    fn set_volume(&mut self, volume: f64) -> Result<(), Self::Error> {
-        self.send_internal_event(InternalEvent::SetVolume(volume))
+    #[cfg(feature = "date")]
+    {
+        let &MediaMetadata {
+            ref content_created,
+            ref first_played,
+            ref last_played,
+        } = metadata;
+        // TODO: handle date types
+        todo!();
     }
-
-    fn set_maximum_rate(&mut self, rate: f64) -> Result<(), Self::Error> {
-        self.send_internal_event(InternalEvent::SetMaximumRate(rate))
-    }
-
-    fn set_minimum_rate(&mut self, rate: f64) -> Result<(), Self::Error> {
-        self.send_internal_event(InternalEvent::SetMinimumRate(rate))
-    }
+    dict
 }
 
 fn run_service<F>(
@@ -271,7 +178,7 @@ where
 {
     let state = Arc::new(Mutex::new(ServiceState {
         playback_status: MediaPlayback::Stopped,
-        loop_status: LoopStatus::None,
+        loop_status: Loop::None,
         rate: 1.0,
         shuffle: false,
         metadata: Default::default(),
@@ -363,7 +270,8 @@ where
             )
             .ok();
         }
-        conn.process(Duration::from_millis(1000))?;
+        // NOTE: Arbitrary timeout duration...
+        conn.process(Duration::from_millis(10))?;
     }
 
     Ok(())
