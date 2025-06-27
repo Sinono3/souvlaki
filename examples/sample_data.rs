@@ -1,10 +1,37 @@
 use std::time::Duration;
 
-use souvlaki::{MediaCover, MediaMetadata, MediaTypeMacos, MediaTypeWindows};
+use souvlaki::{MediaMetadata, MediaTypeMacos, MediaTypeWindows};
 
-pub fn metadata() -> MediaMetadata {
+#[allow(dead_code)]
+fn main() {
+    println!(
+        "This file is a library, which is not meant to be executed. Please use the other examples"
+    )
+}
+
+pub fn album() -> [MediaMetadata; 10] {
+    [
+        (1, "Alison", 232_411_429),
+        (2, "Machine Gun", 268_042_449),
+        (3, "40 Days", 195_735_510),
+        (4, "Sing", 289_306_122),
+        (5, "Here She Comes", 141_008_980),
+        (6, "Souvlaki Space Station", 359_131_429),
+        (7, "When the Sun Hits", 287_451_429),
+        (8, "Altogether", 222_458_776),
+        (9, "Melon Yellow", 233_586_939),
+        (10, "Dagger", 214_674_286),
+    ]
+    .map(|(track_number, title, microseconds)| MediaMetadata {
+        title: Some(title.to_string()),
+        track_number: Some(track_number),
+        duration: Some(Duration::from_micros(microseconds)),
+        ..base()
+    })
+}
+
+pub fn base() -> MediaMetadata {
     MediaMetadata {
-        title: Some("Souvlaki Space Station".to_owned()),
         artist: Some("Slowdive".to_owned()),
         artists: Some(vec!["Slowdive".to_owned()]),
         album_title: Some("Souvlaki".to_owned()),
@@ -12,11 +39,9 @@ pub fn metadata() -> MediaMetadata {
         album_artists: Some(vec!["Slowdive".to_owned()]),
         genre: Some("Shoegaze".to_owned()),
         genres: Some(vec!["Shoegaze".to_owned()]),
-        track_number: Some(6),
         album_track_count: Some(10),
         disc_number: Some(1),
         disc_count: Some(1),
-        duration: Some(Duration::from_micros(359_131_429)),
         lyricists: Some(vec!["Halstead".to_owned()]),
         user_rating_01: Some(0.8),
         user_rating_05: Some(4),
@@ -24,28 +49,56 @@ pub fn metadata() -> MediaMetadata {
         play_count: Some(108),
         skip_count: Some(23),
         media_url: Some("https://www.discogs.com/master/9478-Slowdive-Souvlaki".to_owned()),
-        beats_per_minute: Some(138),
         media_type_macos: Some(MediaTypeMacos {
             music: true,
             ..Default::default()
         }),
         media_type_windows: Some(MediaTypeWindows::Music),
+        // There are more metadata properties...
         ..Default::default()
     }
 }
 
 #[allow(dead_code)]
-pub fn cover() -> MediaCover {
-    // TODO: Correctly handle this
-    MediaCover::HttpUrl(
-        "https://www.discogs.com/master/9478-Slowdive-Souvlaki/image/SW1hZ2U6NDc3NzMyODA="
-            .to_owned(),
-    )
-}
-
+type Cover = <souvlaki::platform::OsImpl as souvlaki::MediaControls>::Cover;
 #[allow(dead_code)]
-fn main() {
-    println!(
-        "This file is a library, which is not meant to be executed. Please use the other examples"
-    )
+pub fn cover() -> Cover {
+    #[allow(dead_code)]
+    const SOUVLAKI_COVER_URL: &'static str = "https://i.discogs.com/i7xH4rv3WwaRaG_ky3mlJCkCQZ18YnczTcNQs9aYpQ0/rs:fit/g:sm/q:90/h:600/w:589/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTgyOTIw/MC0xNTk1MzY1NzA2/LTUwNzUuanBlZw.jpeg";
+
+    // MPRIS platform
+    #[cfg(all(
+        unix,
+        not(any(target_os = "macos", target_os = "ios", target_os = "android"))
+    ))]
+    {
+        souvlaki::platform::mpris::MprisCover::HttpUrl(SOUVLAKI_COVER_URL.to_owned())
+    }
+
+    // macOS/iOS platform
+    #[cfg(any(target_os = "macos"))]
+    {
+        souvlaki::platform::apple::AppleCover::HttpUrl(SOUVLAKI_COVER_URL.to_owned())
+    }
+
+    // macOS/iOS platform
+    #[cfg(any(target_os = "ios"))]
+    {
+        todo!();
+    }
+
+    // Windows platform
+    #[cfg(target_os = "windows")]
+    {
+        todo!()
+    };
+
+    // Dummy platform (for unsupported OSes)
+    #[cfg(any(
+        not(any(unix, target_os = "macos", target_os = "ios", target_os = "windows")),
+        target_os = "android",
+    ))]
+    {
+        todo!();
+    }
 }

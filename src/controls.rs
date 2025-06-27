@@ -4,6 +4,7 @@ use crate::{MediaControlEvent, MediaMetadata, MediaPlayback};
 pub trait MediaControls: Sized {
     type Error;
     type PlatformConfig;
+    type Cover;
 
     /// Create media controls with the specified config.
     fn new(config: Self::PlatformConfig) -> Result<Self, Self::Error>;
@@ -15,8 +16,10 @@ pub trait MediaControls: Sized {
     fn detach(&mut self) -> Result<(), Self::Error>;
     /// Set the current playback status.
     fn set_playback(&mut self, playback: MediaPlayback) -> Result<(), Self::Error>;
-    /// Set the metadata of the currently playing media item.
+    /// Set the metadata of the current media item.
     fn set_metadata(&mut self, metadata: MediaMetadata) -> Result<(), Self::Error>;
+    /// Set the cover art/artwork/thumbnail of the current media item.
+    fn set_cover(&mut self, cover: Self::Cover) -> Result<(), Self::Error>;
 }
 
 /// Wrapper around a specific OS implementation of media controls.
@@ -51,6 +54,10 @@ impl<T: MediaControls> MediaControlsWrapper<T> {
     /// Set the metadata of the currently playing media item.
     pub fn set_metadata(&mut self, metadata: MediaMetadata) -> Result<(), T::Error> {
         self.inner.set_metadata(metadata)
+    }
+    /// Set the cover art/artwork/thumbnail of the current media item.
+    pub fn set_cover(&mut self, cover: T::Cover) -> Result<(), T::Error> {
+        self.inner.set_cover(cover)
     }
 }
 
