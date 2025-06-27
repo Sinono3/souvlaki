@@ -296,7 +296,7 @@ unsafe fn set_playback_metadata(metadata: MediaMetadata) {
         composer_persistent_id,
         genre_persistent_id,
         podcast_persistent_id,
-        // media_type_macos,
+        // TODO: media_type_macos,
         bookmark_time,
         is_cloud_item,
         is_compilation,

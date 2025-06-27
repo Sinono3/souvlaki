@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use souvlaki::{MediaMetadata, MediaTypeMacos, MediaTypeWindows};
+use souvlaki::{MediaMetadata, MediaTypeApple, MediaTypeWindows};
 
 #[allow(dead_code)]
 fn main() {
@@ -49,7 +49,7 @@ pub fn base() -> MediaMetadata {
         play_count: Some(108),
         skip_count: Some(23),
         media_url: Some("https://www.discogs.com/master/9478-Slowdive-Souvlaki".to_owned()),
-        media_type_macos: Some(MediaTypeMacos {
+        media_type_apple: Some(MediaTypeApple {
             music: true,
             ..Default::default()
         }),
