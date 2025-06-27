@@ -234,43 +234,43 @@ pub struct MediaMetadata {
     /// - **MPRIS:** Unsupported
     /// - **macOS:** `MPMediaItem.persistentID`
     /// - **Windows:** Unsupported
-    pub media_persistent_id: Option<String>,
+    pub media_persistent_id: Option<u64>,
 
     /// Persistent identifier for the artist
     /// - **MPRIS:** Unsupported
     /// - **macOS:** `MPMediaItem.artistPersistentID`
     /// - **Windows:** Unsupported
-    pub artist_persistent_id: Option<String>,
+    pub artist_persistent_id: Option<u64>,
 
     /// Persistent identifier for the album
     /// - **MPRIS:** Unsupported
     /// - **macOS:** `MPMediaItem.albumPersistentID`
     /// - **Windows:** Unsupported
-    pub album_persistent_id: Option<String>,
+    pub album_persistent_id: Option<u64>,
 
     /// Persistent identifier for the album artist
     /// - **MPRIS:** Unsupported
     /// - **macOS:** `MPMediaItem.albumArtistPersistentID`
     /// - **Windows:** Unsupported
-    pub album_artist_persistent_id: Option<String>,
+    pub album_artist_persistent_id: Option<u64>,
 
     /// Persistent identifier for the composer
     /// - **MPRIS:** Unsupported
     /// - **macOS:** `MPMediaItem.composerPersistentID`
     /// - **Windows:** Unsupported
-    pub composer_persistent_id: Option<String>,
+    pub composer_persistent_id: Option<u64>,
 
     /// Persistent identifier for the genre
     /// - **MPRIS:** Unsupported
     /// - **macOS:** `MPMediaItem.genrePersistentID`
     /// - **Windows:** Unsupported
-    pub genre_persistent_id: Option<String>,
+    pub genre_persistent_id: Option<u64>,
 
     /// Persistent identifier for a podcast
     /// - **MPRIS:** Unsupported
     /// - **macOS:** `MPMediaItem.podcastPersistentID`
     /// - **Windows:** Unsupported
-    pub podcast_persistent_id: Option<String>,
+    pub podcast_persistent_id: Option<u64>,
 
     /// Media type for macOS (not an enum, but bitflags)
     /// - **MPRIS:** Unsupported
