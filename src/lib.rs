@@ -3,7 +3,6 @@
 use std::{fmt::Debug, time::Duration};
 
 mod controls;
-mod cover;
 /// Contains traits which extend MediaControls by adding additional methods
 /// available only in specific OSes.
 pub mod extensions;
@@ -12,7 +11,6 @@ mod metadata;
 pub mod platform;
 
 pub use controls::{MediaControls, MediaControlsWrapper};
-pub use cover::MediaCover;
 pub use metadata::*;
 
 pub type OsMediaControls = controls::MediaControlsWrapper<crate::platform::OsImpl>;

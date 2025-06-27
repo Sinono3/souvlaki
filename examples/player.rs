@@ -48,6 +48,28 @@ impl TestAppStatus {
             TestAppStatus::Stopped => TestAppStatus::Stopped,
         };
     }
+    pub fn seek_fwd(&mut self, offset: u64) {
+        *self = match *self {
+            TestAppStatus::Playing { position } => TestAppStatus::Playing {
+                position: position + offset,
+            },
+            TestAppStatus::Paused { position } => TestAppStatus::Paused {
+                position: position + offset,
+            },
+            TestAppStatus::Stopped => TestAppStatus::Stopped,
+        };
+    }
+    pub fn seek_bwd(&mut self, offset: u64) {
+        *self = match *self {
+            TestAppStatus::Playing { position } => TestAppStatus::Playing {
+                position: position.saturating_sub(offset),
+            },
+            TestAppStatus::Paused { position } => TestAppStatus::Paused {
+                position: position.saturating_sub(offset),
+            },
+            TestAppStatus::Stopped => TestAppStatus::Stopped,
+        };
+    }
     pub fn to_souvlaki(&self) -> souvlaki::MediaPlayback {
         match *self {
             TestAppStatus::Playing { position } => souvlaki::MediaPlayback::Playing {
@@ -66,7 +88,11 @@ mod sample_data;
 fn main() {
     let event_loop = EventLoop::new();
     #[allow(unused_variables)]
-    let window = WindowBuilder::new().build(&event_loop).unwrap();
+    let window = WindowBuilder::new()
+        .with_inner_size(winit::dpi::PhysicalSize::new(512, 512))
+        .with_title("Souvlaki Player")
+        .build(&event_loop)
+        .unwrap();
 
     // MPRIS platform
     #[cfg(all(
@@ -74,8 +100,8 @@ fn main() {
         not(any(target_os = "macos", target_os = "ios", target_os = "android"))
     ))]
     let config = souvlaki::platform::mpris::MprisConfig {
-        display_name: "My Player".to_owned(),
-        dbus_name: "my_player".to_owned(),
+        display_name: "Souvlaki Player".to_owned(),
+        dbus_name: "souvlaki_player".to_owned(),
     };
 
     // macOS/iOS platform
@@ -185,16 +211,43 @@ fn main() {
                             app.status.go_to(position.0.as_millis() as u64);
                             controls.set_playback(app.status.to_souvlaki()).unwrap();
                         }
-                        // Seek(_) => todo!(),
-                        // SeekBy(_, _) => todo!(),
-                        // SetVolume(_) => todo!(),
-                        // SetPlaybackRate(_) => todo!(),
-                        // SetShuffle(_) => todo!(),
-                        // SetLoop(_) => todo!(),
-                        // OpenUri(_) => todo!(),
-                        // Raise => todo!(),
-                        // Quit => todo!(),
-                        other => eprintln!("Received event: {other:?}"),
+                        Seek(direction) => match direction {
+                            souvlaki::SeekDirection::Forward => {
+                                app.status.seek_fwd(5000);
+                                controls.set_playback(app.status.to_souvlaki()).unwrap();
+                            }
+                            souvlaki::SeekDirection::Backward => {
+                                app.status.seek_bwd(5000);
+                                controls.set_playback(app.status.to_souvlaki()).unwrap();
+                            }
+                        },
+                        SeekBy(direction, offset) => match direction {
+                            souvlaki::SeekDirection::Forward => {
+                                app.status.seek_fwd(offset.as_millis() as u64);
+                                controls.set_playback(app.status.to_souvlaki()).unwrap();
+                            }
+                            souvlaki::SeekDirection::Backward => {
+                                app.status.seek_bwd(offset.as_millis() as u64);
+                                controls.set_playback(app.status.to_souvlaki()).unwrap();
+                            }
+                        },
+                        SetVolume(_) => todo!(),
+                        SetPlaybackRate(_) => todo!(),
+                        SetShuffle(_) => todo!(),
+                        SetLoop(_) => todo!(),
+                        OpenUri(_) => {
+                            eprintln!("This example player does not support opening URIs");
+                        }
+                        Raise => {
+                            window.request_user_attention(Some(
+                                winit::window::UserAttentionType::Informational,
+                            ));
+                            window.focus_window();
+                        }
+                        Quit => {
+                            eprintln!("Quitting...");
+                            return;
+                        }
                     }
                 }
 

@@ -1,7 +1,7 @@
 #!/bin/sh
 # This scripts requires playerctl and dbus-send
 
-alias playerctl="playerctl -p my_player "
+alias playerctl="playerctl -p souvlaki_player "
 
 playerctl metadata
 playerctl play

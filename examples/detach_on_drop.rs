@@ -10,8 +10,8 @@ fn main() {
             not(any(target_os = "macos", target_os = "ios", target_os = "android"))
         ))]
         let config = souvlaki::platform::mpris::MprisConfig {
-            display_name: "My Player".to_owned(),
-            dbus_name: "my_player".to_owned(),
+            display_name: "Souvlaki Player".to_owned(),
+            dbus_name: "souvlaki_player".to_owned(),
         };
 
         // macOS platform
