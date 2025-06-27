@@ -2,6 +2,7 @@
 #![allow(non_upper_case_globals)]
 
 use std::{
+    path::PathBuf,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
@@ -25,30 +26,47 @@ use crate::{
 
 /// A platform-specific error.
 #[derive(Debug)]
-pub struct MacosError;
+pub struct AppleError;
 
-impl std::fmt::Display for MacosError {
+impl std::fmt::Display for AppleError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(f, "Error")
     }
 }
 
-impl std::error::Error for MacosError {}
+impl std::error::Error for AppleError {}
 
-/// A handle to OS media controls.
-pub struct Macos;
+/// A handle to Apple's MPRemoteCommandCenter and the NowPlaying interface
+pub struct Apple;
 
-pub type OsImpl = Macos;
+pub type OsImpl = Apple;
 
-impl MediaControls for Macos {
-    type Error = MacosError;
+/// Definition/reference to cover art for Apple platforms.
+/// Differs depending on whether it's macOS or iOS.
+#[cfg(platform_macos)]
+pub enum AppleCover {
+    /// Available only on macOS.
+    #[cfg(platform_macos)]
+    HttpUrl(String),
+    /// Available only on macOS.
+    /// Hasn't been tested on iOS yet
+    #[cfg(platform_macos)]
+    DataUrl(String),
+    /// Available on both macOS and iOS.
+    LocalFile(PathBuf),
+    // TODO: Add bytes option
+}
+
+impl MediaControls for Apple {
+    type Error = AppleError;
     type PlatformConfig = ();
+    type Cover = AppleCover;
 
-    fn new(_config: Self::PlatformConfig) -> Result<Self, MacosError> {
+    fn new(_config: Self::PlatformConfig) -> Result<Self, AppleError> {
         Ok(Self)
     }
 
-    fn attach<F>(&mut self, event_handler: F) -> Result<(), MacosError>
+    fn attach<F>(&mut self, event_handler: F) -> Result<(), AppleError>
     where
         F: Fn(MediaControlEvent) + Send + 'static,
     {
@@ -56,18 +74,32 @@ impl MediaControls for Macos {
         Ok(())
     }
 
-    fn detach(&mut self) -> Result<(), MacosError> {
+    fn detach(&mut self) -> Result<(), AppleError> {
         unsafe { detach_command_handlers() };
         Ok(())
     }
 
-    fn set_playback(&mut self, playback: MediaPlayback) -> Result<(), MacosError> {
+    fn set_playback(&mut self, playback: MediaPlayback) -> Result<(), AppleError> {
         unsafe { set_playback_status(playback) };
         Ok(())
     }
 
-    fn set_metadata(&mut self, metadata: MediaMetadata) -> Result<(), MacosError> {
+    fn set_metadata(&mut self, metadata: MediaMetadata) -> Result<(), AppleError> {
         unsafe { set_playback_metadata(metadata) };
+        Ok(())
+    }
+
+    fn set_cover(&mut self, cover: Self::Cover) -> Result<(), Self::Error> {
+        match cover {
+            AppleCover::HttpUrl(cover_url) | AppleCover::DataUrl(cover_url) => {
+                // NOTE: Is this correct to do?
+                let prev_counter = GLOBAL_METADATA_COUNTER.fetch_add(1, Ordering::SeqCst);
+                Queue::global(QueuePriority::Default).exec_async(move || unsafe {
+                    load_and_set_playback_artwork(cover_url, prev_counter + 1);
+                });
+            }
+            AppleCover::LocalFile(_cover_path) => {}
+        }
         Ok(())
     }
 }
@@ -228,7 +260,6 @@ unsafe fn set_playback_status(playback: MediaPlayback) {
 static GLOBAL_METADATA_COUNTER: AtomicUsize = AtomicUsize::new(1);
 
 unsafe fn set_playback_metadata(metadata: MediaMetadata) {
-    let prev_counter = GLOBAL_METADATA_COUNTER.fetch_add(1, Ordering::SeqCst);
     let media_center: id = msg_send!(class!(MPNowPlayingInfoCenter), defaultCenter);
     let now_playing: id = msg_send!(class!(NSMutableDictionary), dictionary);
 
@@ -372,14 +403,6 @@ unsafe fn set_playback_metadata(metadata: MediaMetadata) {
     );
     set_metadata!(ns_string, podcast_title, MPMediaItemPropertyPodcastTitle);
     set_metadata!(ns_string, user_grouping, MPMediaItemPropertyUserGrouping);
-
-    // TODO: artwork
-    // if let Some(cover_url) = metadata.cover_url {
-    //     let cover_url = cover_url.to_owned();
-    //     Queue::global(QueuePriority::Default).exec_async(move || {
-    //         load_and_set_playback_artwork(cover_url, prev_counter + 1);
-    //     });
-    // }
 
     // TODO: date support
     // let MediaMetadata {

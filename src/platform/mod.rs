@@ -5,9 +5,9 @@ pub use mpris::{Mpris as OsImpl, MprisError as OsError};
 
 // Both macOS and iOS are under the Apple platform
 #[cfg(platform_apple)]
-pub mod macos;
+pub mod apple;
 #[cfg(platform_apple)]
-pub use macos::{Macos as OsImpl, MacosError as OsError};
+pub use apple::{Apple as OsImpl, AppleError as OsError};
 
 #[cfg(platform_windows)]
 pub mod windows;
