@@ -1,4 +1,5 @@
 use std::ffi::c_void;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -8,6 +9,8 @@ use ::windows::Media::*;
 use ::windows::Storage::Streams::RandomAccessStreamReference;
 use ::windows::Win32::Foundation::HWND;
 use ::windows::Win32::System::WinRT::ISystemMediaTransportControlsInterop;
+use windows::core::Interface;
+use windows::Storage::Streams::{DataWriter, IRandomAccessStream, InMemoryRandomAccessStream};
 
 use crate::{
     MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, SeekDirection,
@@ -16,6 +19,7 @@ use crate::{
 pub use ::windows::core::Error as WindowsError;
 
 /// A handle to Windows' SystemMediaTransportControls
+#[derive(Debug)]
 pub struct Windows {
     controls: SystemMediaTransportControls,
     button_handler_token: Option<EventRegistrationToken>,
@@ -30,6 +34,18 @@ pub struct WindowsConfig {
     pub hwnd: *mut c_void,
 }
 
+// TODO: Implement debug properly
+/// Definition/reference to cover art for Windows.
+#[derive(Clone, Debug)]
+pub enum WindowsCover {
+    /// Loads the image via [`RandomAccessStreamReference.CreateFromUri`](https://learn.microsoft.com/en-us/uwp/api/windows.storage.streams.randomaccessstreamreference.createfromuri?view=winrt-26100#windows-storage-streams-randomaccessstreamreference-createfromuri(windows-foundation-uri))
+    Uri(String),
+    /// Loads the image via [`RandomAccessStreamReference.CreateFromFile`](https://learn.microsoft.com/en-us/uwp/api/windows.storage.streams.randomaccessstreamreference.createfromfile?view=winrt-26100#windows-storage-streams-randomaccessstreamreference-createfromfile(windows-storage-istoragefile))
+    LocalFile(PathBuf),
+    /// Loads the image via [`RandomAccessStreamReference.CreateFromStream`](https://learn.microsoft.com/en-us/uwp/api/windows.storage.streams.randomaccessstreamreference.createfromstream?view=winrt-26100#windows-storage-streams-randomaccessstreamreference-createfromstream(windows-storage-streams-irandomaccessstream))
+    Bytes(Vec<u8>),
+}
+
 #[repr(i32)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 enum SmtcPlayback {
@@ -41,6 +57,7 @@ enum SmtcPlayback {
 impl MediaControls for Windows {
     type Error = WindowsError;
     type PlatformConfig = WindowsConfig;
+    type Cover = WindowsCover;
 
     fn new(config: Self::PlatformConfig) -> Result<Self, Self::Error> {
         let interop: ISystemMediaTransportControlsInterop = windows::core::factory::<
@@ -86,6 +103,7 @@ impl MediaControls for Windows {
                     args.as_ref().unwrap();
                 let button = args.Button()?;
 
+                // We cannot match on these...
                 let event = if button == SystemMediaTransportControlsButton::Play {
                     MediaControlEvent::Play
                 } else if button == SystemMediaTransportControlsButton::Pause {
@@ -173,22 +191,6 @@ impl MediaControls for Windows {
         if let Some(album_title) = metadata.album_title {
             properties.SetAlbumTitle(&HSTRING::from(album_title))?;
         }
-        // TODO:
-        // if let Some(url) = metadata.cover_url {
-        //     let stream = if url.starts_with("file://") {
-        //         // url is a file, load it manually
-        //         let path = url.trim_start_matches("file://");
-        //         let loader =
-        //             windows::Storage::StorageFile::GetFileFromPathAsync(&HSTRING::from(path))?;
-        //         let results = loader.get()?;
-        //         loader.Close()?;
-
-        //         RandomAccessStreamReference::CreateFromFile(&results)?
-        //     } else {
-        //         RandomAccessStreamReference::CreateFromUri(&Uri::CreateUri(&HSTRING::from(url))?)?
-        //     };
-        //     self.display_updater.SetThumbnail(&stream)?;
-        // }
         let duration = metadata.duration.unwrap_or_default();
         self.timeline_properties.SetStartTime(TimeSpan::default())?;
         self.timeline_properties
@@ -203,4 +205,41 @@ impl MediaControls for Windows {
         self.display_updater.Update()?;
         Ok(())
     }
+
+    fn set_cover(&mut self, cover: Option<Self::Cover>) -> Result<(), Self::Error> {
+        let stream = match cover {
+            Some(WindowsCover::Uri(uri)) => {
+                RandomAccessStreamReference::CreateFromUri(&Uri::CreateUri(&HSTRING::from(uri))?)?
+            }
+            Some(WindowsCover::LocalFile(path)) => {
+                let loader = windows::Storage::StorageFile::GetFileFromPathAsync(&HSTRING::from(
+                    path.as_path(),
+                ))?;
+                let results = loader.get()?;
+                loader.Close()?;
+                RandomAccessStreamReference::CreateFromFile(&results)?
+            }
+            // TODO: Verify if this works on Windows
+            Some(WindowsCover::Bytes(bytes)) => {
+                let stream = create_stream_from_bytes(bytes)?;
+                RandomAccessStreamReference::CreateFromStream(&stream)?
+            }
+            None => todo!(),
+        };
+        self.display_updater.SetThumbnail(&stream)?;
+        Ok(())
+    }
+}
+
+fn create_stream_from_bytes(data: Vec<u8>) -> Result<IRandomAccessStream, WindowsError> {
+    let stream = InMemoryRandomAccessStream::new()?;
+
+    let output_stream = stream.GetOutputStreamAt(0)?;
+    let writer = DataWriter::CreateDataWriter(&output_stream)?;
+    writer.WriteBytes(&data)?;
+    writer.StoreAsync()?.get()?;
+    writer.Close()?;
+    output_stream.Close()?;
+
+    Ok(stream.cast::<IRandomAccessStream>()?)
 }
