@@ -75,11 +75,7 @@ where
                     );
                 }
                 InternalEvent::SetCover(cover) => {
-                    let cover_url = if let Some(MprisCover::Url(cover_url)) = cover {
-                        Some(cover_url)
-                    } else {
-                        None
-                    };
+                    let cover_url = MprisCover::to_url(cover);
                     let mut state = state.lock().unwrap();
                     state.metadata_dict = create_metadata_dict(&state.metadata, &cover_url);
                     state.cover_url = cover_url;

@@ -1,15 +1,15 @@
 #![cfg(platform_mpris)]
 
 #[cfg(not(any(feature = "dbus", feature = "zbus")))]
-compile_error!("either feature \"dbus\" or feature \"zbus\" are required");
+compile_error!("either feature \"mpris_dbus\" or feature \"mpris_zbus\" are required");
 
 #[cfg(all(feature = "dbus", feature = "zbus"))]
-compile_error!("feature \"dbus\" and feature \"zbus\" are mutually exclusive");
+compile_error!("feature \"mpris_dbus\" and feature \"mpris_zbus\" are mutually exclusive");
 
-#[cfg(feature = "zbus")]
+#[cfg(platform_mpris_zbus)]
 mod zbus;
 
-#[cfg(feature = "dbus")]
+#[cfg(platform_mpris_dbus)]
 mod dbus;
 
 /// MPRIS-specific configuration needed to create media controls.
@@ -25,10 +25,10 @@ pub struct MprisConfig {
 #[derive(thiserror::Error, Debug)]
 pub enum MprisError {
     #[error("internal D-Bus error: {0}")]
-    #[cfg(feature = "dbus")]
+    #[cfg(platform_mpris_dbus)]
     DbusError(#[from] ::dbus::Error),
     #[error("internal D-Bus error: {0}")]
-    #[cfg(feature = "zbus")]
+    #[cfg(platform_mpris_zbus)]
     DbusError(#[from] ::zbus::Error),
     #[error("D-bus service thread not running. Run MediaControls::attach()")]
     ThreadNotRunning,
@@ -38,6 +38,8 @@ pub enum MprisError {
     // to at least be able to catch it, but it is preferable to have this thread *not panic* at all.
     #[error("D-Bus service thread panicked")]
     ThreadPanicked,
+    #[error("Couldnt't infer mimetype from cover image bytes. Make sure the image data is valid.")]
+    InvalidCoverBytes,
 }
 
 /// Definition/reference to cover art for MPRIS platforms.
@@ -46,13 +48,31 @@ pub enum MprisCover {
     /// Simply sets the metadata field `mpris:artUrl` to this string.
     /// It depends on the
     Url(String),
-    // TODO
-    // /// Sets the `mpris:artUrl` field to an Base64-encoded
-    // /// data URL of the provided image bytes.
-    // /// Can be inefficient, but it works and is easy to work with,
-    // /// in case you don't want to save to a file for the URL option.
-    // #[cfg(feature = "mpris_base64_data_url")]
-    // BytesToDataUrl(Vec<u8>),
+    // Even though it only has one option, it is an enum in case
+    // we need further expansion in the future.
+}
+
+impl MprisCover {
+    fn to_url(cover: Option<Self>) -> Option<String> {
+        match cover {
+            Some(MprisCover::Url(cover_url)) => Some(cover_url),
+            None => None,
+        }
+    }
+
+    /// Sets the `mpris:artUrl` field to an Base64-encoded
+    /// data URL of the provided image bytes.
+    /// Can be inefficient, but it works and is easy to work with,
+    /// in case you don't want to save to a file for the URL option.
+    #[cfg(feature = "mpris_base64_data_url")]
+    pub fn from_bytes(image_data: &[u8]) -> Result<Self, MprisError> {
+        use base64::Engine;
+        let engine = base64::engine::general_purpose::URL_SAFE;
+        let mimetype = infer::get(image_data).ok_or(MprisError::InvalidCoverBytes)?;
+        let mut out = format!("data:{mimetype};base64,");
+        engine.encode_string(image_data, &mut out);
+        Ok(Self::Url(out))
+    }
 }
 
 use crate::{extensions::MprisPropertiesExt, Loop, MediaMetadata, MediaPlayback};

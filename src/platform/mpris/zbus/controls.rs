@@ -77,12 +77,7 @@ where
                     interface.metadata_changed(&ctxt).await?;
                 }
                 InternalEvent::SetCover(cover) => {
-                    let cover_url = if let Some(MprisCover::Url(cover_url)) = cover {
-                        Some(cover_url)
-                    } else {
-                        None
-                    };
-
+                    let cover_url = MprisCover::to_url(cover);
                     interface.state.metadata_dict =
                         create_metadata_dict(&interface.state.metadata, &cover_url);
                     interface.state.cover_url = cover_url;

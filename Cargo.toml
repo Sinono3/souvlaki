@@ -10,10 +10,11 @@ license = "MIT"
 rust-version = "1.67"
 
 [features]
-default = ["use_dbus"]
-use_dbus = ["dbus", "dbus-crossroads"]
-use_zbus = ["zbus", "zvariant", "pollster"]
+default = ["mpris_dbus", "mpris_base64_data_url"]
 date = ["time"]
+mpris_dbus = ["dbus", "dbus-crossroads"]
+mpris_zbus = ["zbus", "zvariant", "pollster"]
+mpris_base64_data_url = ["base64", "infer"]
 
 # MPRIS deps (Linux/BSD)
 [target.'cfg(all(unix, not(any(target_os = "macos", target_os = "ios", target_os = "android"))))'.dependencies]
@@ -24,6 +25,8 @@ zvariant = { version = "3.10", optional = true }
 pollster = { version = "0.3", optional = true }
 time = { version = "0.3", optional = true }
 thiserror = "1.0"
+base64 = { version = "0.22.1", optional = true }
+infer = { version = "0.3", default-features = false, optional = true }
 
 # Apple (MacOS/iOS) deps
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
