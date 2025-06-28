@@ -567,9 +567,11 @@ where
 
 #[cfg(platform_ios)]
 unsafe fn load_image_from_path(path: &str) -> (id, CGSize) {
+    use base64::Engine;
     use std::fs;
     let image_data = fs::read(&path).unwrap();
-    let base64_data = base64::encode(image_data);
+    let engine = base64::engine::general_purpose::URL_SAFE;
+    let base64_data = engine.encode(image_data);
     let base64_ns_string = ns_string(&base64_data);
     let ns_data: id = msg_send!(class!(NSData), alloc);
     let ns_data: id = msg_send!(ns_data, initWithBase64EncodedString: base64_ns_string
@@ -605,7 +607,9 @@ unsafe fn load_image_from_url(url: &str) -> (id, CGSize) {
 
 unsafe fn load_image_from_bytes(image_data: &[u8]) -> (id, CGSize) {
     // TODO: Change to use unsafe raw pointer
-    let base64_data = base64::encode(image_data);
+    use base64::Engine;
+    let engine = base64::engine::general_purpose::URL_SAFE;
+    let base64_data = engine.encode(image_data);
     let base64_ns_string = ns_string(&base64_data);
     let ns_data: id = msg_send!(class!(NSData), alloc);
     let ns_data: id = msg_send!(ns_data, initWithBase64EncodedString: base64_ns_string
