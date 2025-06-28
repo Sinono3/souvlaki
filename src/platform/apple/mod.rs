@@ -93,20 +93,20 @@ impl MediaControls for Apple {
         Ok(())
     }
 
-    fn set_cover(&mut self, cover: Self::Cover) -> Result<(), Self::Error> {
+    fn set_cover(&mut self, cover: Option<Self::Cover>) -> Result<(), Self::Error> {
         let prev_counter = GLOBAL_METADATA_COUNTER.fetch_add(1, Ordering::SeqCst);
 
         match cover {
             // Available only on macOS
             #[cfg(platform_macos)]
-            AppleCover::Url(cover_url) => {
+            Some(AppleCover::Url(cover_url)) => {
                 load_and_set_artwork(
                     move || unsafe { load_image_from_url(&cover_url) },
                     prev_counter + 1,
                 );
             }
             // Available on macOS/iOS
-            AppleCover::LocalFile(cover_path) => {
+            Some(AppleCover::LocalFile(cover_path)) => {
                 let cover_path = cover_path
                     .to_str()
                     .ok_or(AppleError::NonUtf8Path)?
@@ -118,12 +118,15 @@ impl MediaControls for Apple {
                 );
             }
             // Available on macOS/iOS
-            AppleCover::Bytes(bytes) => {
+            Some(AppleCover::Bytes(bytes)) => {
                 load_and_set_artwork(
                     move || unsafe { load_image_from_bytes(&bytes) },
                     prev_counter + 1,
                 );
             }
+            None => unsafe {
+                set_playback_artwork(nil);
+            },
         };
 
         Ok(())
