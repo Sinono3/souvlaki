@@ -40,9 +40,19 @@ pub enum MprisError {
     ThreadPanicked,
 }
 
+/// Definition/reference to cover art for MPRIS platforms.
 #[derive(Clone, Debug)]
 pub enum MprisCover {
+    /// Simply sets the metadata field `mpris:artUrl` to this string.
+    /// It depends on the
     Url(String),
+    // TODO
+    // /// Sets the `mpris:artUrl` field to an Base64-encoded
+    // /// data URL of the provided image bytes.
+    // /// Can be inefficient, but it works and is easy to work with,
+    // /// in case you don't want to save to a file for the URL option.
+    // #[cfg(feature = "mpris_base64_data_url")]
+    // BytesToDataUrl(Vec<u8>),
 }
 
 use crate::{extensions::MprisPropertiesExt, Loop, MediaMetadata, MediaPlayback};
