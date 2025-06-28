@@ -62,7 +62,7 @@ pub fn base() -> MediaMetadata {
 #[allow(dead_code)]
 type Cover = <souvlaki::platform::OsImpl as souvlaki::MediaControls>::Cover;
 #[allow(dead_code)]
-pub fn cover() -> Cover {
+pub fn cover() -> Option<Cover> {
     #[allow(dead_code)]
     const SOUVLAKI_COVER_URL: &'static str = "https://i.discogs.com/i7xH4rv3WwaRaG_ky3mlJCkCQZ18YnczTcNQs9aYpQ0/rs:fit/g:sm/q:90/h:600/w:589/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTgyOTIw/MC0xNTk1MzY1NzA2/LTUwNzUuanBlZw.jpeg";
 
@@ -72,17 +72,21 @@ pub fn cover() -> Cover {
         not(any(target_os = "macos", target_os = "ios", target_os = "android"))
     ))]
     {
-        souvlaki::platform::mpris::MprisCover::Url(SOUVLAKI_COVER_URL.to_owned())
+        Some(souvlaki::platform::mpris::MprisCover::Url(
+            SOUVLAKI_COVER_URL.to_owned(),
+        ))
     }
 
-    // macOS/iOS platform
-    #[cfg(any(target_os = "macos"))]
+    // macOS platform
+    #[cfg(target_os = "macos")]
     {
-        souvlaki::platform::apple::AppleCover::Url(SOUVLAKI_COVER_URL.to_owned())
+        Some(souvlaki::platform::apple::AppleCover::Url(
+            SOUVLAKI_COVER_URL.to_owned(),
+        ))
     }
 
-    // macOS/iOS platform
-    #[cfg(any(target_os = "ios"))]
+    // iOS platform (can't use URLs, only local files or bytes)
+    #[cfg(target_os = "ios")]
     {
         todo!();
     }
@@ -90,7 +94,9 @@ pub fn cover() -> Cover {
     // Windows platform
     #[cfg(target_os = "windows")]
     {
-        todo!()
+        Some(souvlaki::platform::apple::AppleCover::Url(
+            SOUVLAKI_COVER_URL.to_owned(),
+        ))
     };
 
     // Dummy platform (for unsupported OSes)
@@ -99,6 +105,45 @@ pub fn cover() -> Cover {
         target_os = "android",
     ))]
     {
-        todo!();
+        None
+    }
+}
+
+#[allow(dead_code)]
+pub fn cover_bytes() -> Option<Cover> {
+    const COVER_BYTES: &'static [u8] = include_bytes!("./cover.png");
+
+    // MPRIS platform
+    #[cfg(all(
+        unix,
+        not(any(target_os = "macos", target_os = "ios", target_os = "android"))
+    ))]
+    {
+        Some(souvlaki::platform::mpris::MprisCover::from_bytes(COVER_BYTES).unwrap())
+    }
+
+    // macOS/iOS platform
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    {
+        Some(souvlaki::platform::apple::AppleCover::Bytes(
+            COVER_BYTES.to_vec(),
+        ))
+    }
+
+    // Windows platform
+    #[cfg(target_os = "windows")]
+    {
+        Some(souvlaki::platform::apple::WindowsCover::Bytes(
+            COVER_BYTES.to_vec(),
+        ))
+    };
+
+    // Dummy platform (for unsupported OSes)
+    #[cfg(any(
+        not(any(unix, target_os = "macos", target_os = "ios", target_os = "windows")),
+        target_os = "android",
+    ))]
+    {
+        None
     }
 }
