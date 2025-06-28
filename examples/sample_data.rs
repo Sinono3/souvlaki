@@ -72,13 +72,13 @@ pub fn cover() -> Cover {
         not(any(target_os = "macos", target_os = "ios", target_os = "android"))
     ))]
     {
-        souvlaki::platform::mpris::MprisCover::HttpUrl(SOUVLAKI_COVER_URL.to_owned())
+        souvlaki::platform::mpris::MprisCover::Url(SOUVLAKI_COVER_URL.to_owned())
     }
 
     // macOS/iOS platform
     #[cfg(any(target_os = "macos"))]
     {
-        souvlaki::platform::apple::AppleCover::HttpUrl(SOUVLAKI_COVER_URL.to_owned())
+        souvlaki::platform::apple::AppleCover::Url(SOUVLAKI_COVER_URL.to_owned())
     }
 
     // macOS/iOS platform

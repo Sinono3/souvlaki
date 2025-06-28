@@ -41,9 +41,10 @@ fn main() {
         .unwrap();
 
     // Update the media metadata.
-    controls.set_metadata(sample_data::metadata()).unwrap();
+    controls
+        .set_metadata(sample_data::album().clone()[6].clone())
+        .unwrap();
 
-    // Your actual logic goes here.
     loop {
         std::thread::sleep(std::time::Duration::from_millis(1));
 

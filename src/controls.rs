@@ -1,10 +1,13 @@
+use std::error::Error;
+use std::fmt::Debug;
+
 use crate::{MediaControlEvent, MediaMetadata, MediaPlayback};
 
 /// Defines fundamental operations needed for media controls.
-pub trait MediaControls: Sized {
-    type Error;
-    type PlatformConfig;
-    type Cover;
+pub trait MediaControls: Sized + Debug {
+    type Error: Error + Debug;
+    type PlatformConfig: Debug;
+    type Cover: Clone + Debug;
 
     /// Create media controls with the specified config.
     fn new(config: Self::PlatformConfig) -> Result<Self, Self::Error>;

@@ -33,6 +33,7 @@ core-graphics = "0.22.2"
 dispatch = "0.2.0"
 objc = "0.2.7"
 base64 = "0.22.1"
+thiserror = "1.0"
 
 # Windows deps
 [target.'cfg(target_os = "windows")'.dependencies.windows]

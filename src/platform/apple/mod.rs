@@ -25,18 +25,15 @@ use crate::{
 };
 
 /// A platform-specific error.
-#[derive(Debug)]
-pub struct AppleError;
-
-impl std::fmt::Display for AppleError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "Error")
-    }
+#[derive(Debug, thiserror::Error)]
+pub enum AppleError {
+    // TODO: They *could* be supported, though, can't they?
+    #[error("Non UTF-8 paths are not supported for cover art loading")]
+    NonUtf8Path,
 }
 
-impl std::error::Error for AppleError {}
-
 /// A handle to Apple's MPRemoteCommandCenter and the NowPlaying interface
+#[derive(Debug)]
 pub struct Apple;
 
 pub type OsImpl = Apple;
@@ -44,17 +41,24 @@ pub type OsImpl = Apple;
 /// Definition/reference to cover art for Apple platforms.
 /// Differs depending on whether it's macOS or iOS.
 #[cfg(platform_macos)]
+#[derive(Clone, Debug)]
 pub enum AppleCover {
     /// Available only on macOS.
+    /// May work with HTTP URLs, data URLs, file URLs. Hasn't been tested with others.
     #[cfg(platform_macos)]
-    HttpUrl(String),
-    /// Available only on macOS.
-    /// Hasn't been tested on iOS yet
-    #[cfg(platform_macos)]
-    DataUrl(String),
-    /// Available on both macOS and iOS.
+    Url(String),
+    /// Available on macOS/iOS.
+    /// If the file is not found, it will silently fail and display a blank
+    /// image as the artwork.
+    /// As of currently, receiving errors from
+    /// async calls to macOS is not implemented.
     LocalFile(PathBuf),
-    // TODO: Add bytes option
+    /// Available on macOS/iOS.
+    /// If the bytes are not recognized as an image,
+    /// it will silently fail and display a blank image as the artwork.
+    /// As of currently, receiving errors from
+    /// async calls to macOS is not implemented.
+    Bytes(Vec<u8>),
 }
 
 impl MediaControls for Apple {
@@ -90,16 +94,38 @@ impl MediaControls for Apple {
     }
 
     fn set_cover(&mut self, cover: Self::Cover) -> Result<(), Self::Error> {
+        let prev_counter = GLOBAL_METADATA_COUNTER.fetch_add(1, Ordering::SeqCst);
+
         match cover {
-            AppleCover::HttpUrl(cover_url) | AppleCover::DataUrl(cover_url) => {
-                // NOTE: Is this correct to do?
-                let prev_counter = GLOBAL_METADATA_COUNTER.fetch_add(1, Ordering::SeqCst);
-                Queue::global(QueuePriority::Default).exec_async(move || unsafe {
-                    load_and_set_playback_artwork(cover_url, prev_counter + 1);
-                });
+            // Available only on macOS
+            #[cfg(platform_macos)]
+            AppleCover::Url(cover_url) => {
+                load_and_set_artwork(
+                    move || unsafe { load_image_from_url(&cover_url) },
+                    prev_counter + 1,
+                );
             }
-            AppleCover::LocalFile(_cover_path) => {}
-        }
+            // Available on macOS/iOS
+            AppleCover::LocalFile(cover_path) => {
+                let cover_path = cover_path
+                    .to_str()
+                    .ok_or(AppleError::NonUtf8Path)?
+                    .to_owned();
+
+                load_and_set_artwork(
+                    move || unsafe { load_image_from_path(&cover_path) },
+                    prev_counter + 1,
+                );
+            }
+            // Available on macOS/iOS
+            AppleCover::Bytes(bytes) => {
+                load_and_set_artwork(
+                    move || unsafe { load_image_from_bytes(&bytes) },
+                    prev_counter + 1,
+                );
+            }
+        };
+
         Ok(())
     }
 }
@@ -416,14 +442,6 @@ unsafe fn set_playback_metadata(metadata: MediaMetadata) {
     let _: () = msg_send!(media_center, setNowPlayingInfo: now_playing);
 }
 
-unsafe fn load_and_set_playback_artwork(url: String, for_counter: usize) {
-    let (image, size) = load_image_from_url(&url);
-    let artwork = mp_artwork(image, size);
-    if GLOBAL_METADATA_COUNTER.load(Ordering::SeqCst) == for_counter {
-        set_playback_artwork(artwork);
-    }
-}
-
 unsafe fn set_playback_artwork(artwork: id) {
     let media_center: id = msg_send!(class!(MPNowPlayingInfoCenter), defaultCenter);
     let now_playing: id = msg_send!(class!(NSMutableDictionary), dictionary);
@@ -531,13 +549,25 @@ unsafe fn ns_url(value: &str) -> id {
     msg_send!(class!(NSURL), URLWithString: ns_string(value))
 }
 
+fn load_and_set_artwork<F>(loader: F, for_counter: usize)
+where
+    F: FnOnce() -> (id, CGSize) + Send + Sync + 'static,
+{
+    Queue::global(QueuePriority::Default).exec_async(move || unsafe {
+        let (image, size) = loader();
+        let artwork = mp_artwork(image, size);
+        if GLOBAL_METADATA_COUNTER.load(Ordering::SeqCst) == for_counter {
+            set_playback_artwork(artwork);
+        }
+    });
+}
+
 #[cfg(platform_ios)]
-unsafe fn load_image_from_url(url: &str) -> (id, CGSize) {
+unsafe fn load_image_from_path(path: &str) -> (id, CGSize) {
     use std::fs;
-    let image_data = fs::read(&url).unwrap();
+    let image_data = fs::read(&path).unwrap();
     let base64_data = base64::encode(image_data);
     let base64_ns_string = ns_string(&base64_data);
-
     let ns_data: id = msg_send!(class!(NSData), alloc);
     let ns_data: id = msg_send!(ns_data, initWithBase64EncodedString: base64_ns_string
                                           options: 0);
@@ -553,6 +583,15 @@ unsafe fn load_image_from_url(url: &str) -> (id, CGSize) {
 }
 
 #[cfg(platform_macos)]
+unsafe fn load_image_from_path(path: &str) -> (id, CGSize) {
+    let path = ns_string(path);
+    let image: id = msg_send!(class!(NSImage), alloc);
+    let image: id = msg_send!(image, initWithContentsOfFile: path);
+    let size: CGSize = msg_send!(image, size);
+    (image, CGSize::new(size.width, size.height))
+}
+
+#[cfg(platform_macos)]
 unsafe fn load_image_from_url(url: &str) -> (id, CGSize) {
     let url = ns_url(url);
     let image: id = msg_send!(class!(NSImage), alloc);
@@ -561,14 +600,33 @@ unsafe fn load_image_from_url(url: &str) -> (id, CGSize) {
     (image, CGSize::new(size.width, size.height))
 }
 
-#[cfg(platform_ios)]
-unsafe fn mp_artwork(image: id, bounds: CGSize) -> id {
-    let artwork: id = msg_send!(class!(MPMediaItemArtwork), alloc);
-    let artwork: id = msg_send!(artwork, initWithImage: image);
-    artwork
+unsafe fn load_image_from_bytes(image_data: &[u8]) -> (id, CGSize) {
+    // TODO: Change to use unsafe raw pointer
+    let base64_data = base64::encode(image_data);
+    let base64_ns_string = ns_string(&base64_data);
+    let ns_data: id = msg_send!(class!(NSData), alloc);
+    let ns_data: id = msg_send!(ns_data, initWithBase64EncodedString: base64_ns_string
+                                          options: 0);
+    if ns_data == nil {
+        return (nil, CGSize::new(0.0, 0.0));
+    }
+
+    #[cfg(platform_macos)]
+    let image: id = {
+        let image: id = msg_send!(class!(NSImage), alloc);
+        let image: id = msg_send!(image, initWithData: ns_data);
+        image
+    };
+    #[cfg(platform_ios)]
+    let image: id = msg_send!(class!(UIImage), initWithData: ns_data);
+
+    if image == nil {
+        return (nil, CGSize::new(0.0, 0.0));
+    }
+    let size: CGSize = msg_send!(image, size);
+    (image, size)
 }
 
-#[cfg(platform_macos)]
 unsafe fn mp_artwork(image: id, bounds: CGSize) -> id {
     let handler = ConcreteBlock::new(move |_size: CGSize| -> id { image }).copy();
     let artwork: id = msg_send!(class!(MPMediaItemArtwork), alloc);
