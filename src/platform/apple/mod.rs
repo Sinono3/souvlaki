@@ -119,6 +119,7 @@ impl MediaControls for Apple {
             }
             // Available on macOS/iOS
             Some(AppleCover::Bytes(bytes)) => {
+                println!("?");
                 load_and_set_artwork(
                     move || unsafe { load_image_from_bytes(&bytes) },
                     prev_counter + 1,
@@ -608,7 +609,7 @@ unsafe fn load_image_from_url(url: &str) -> (id, CGSize) {
 unsafe fn load_image_from_bytes(image_data: &[u8]) -> (id, CGSize) {
     // TODO: Change to use unsafe raw pointer
     use base64::Engine;
-    let engine = base64::engine::general_purpose::URL_SAFE;
+    let engine = base64::engine::general_purpose::STANDARD;
     let base64_data = engine.encode(image_data);
     let base64_ns_string = ns_string(&base64_data);
     let ns_data: id = msg_send!(class!(NSData), alloc);
@@ -625,7 +626,7 @@ unsafe fn load_image_from_bytes(image_data: &[u8]) -> (id, CGSize) {
         image
     };
     #[cfg(platform_ios)]
-    let image: id = msg_send!(class!(UIImage), initWithData: ns_data);
+    let image: id = msg_send!(class!(UIImage), imageWithData: ns_data);
 
     if image == nil {
         return (nil, CGSize::new(0.0, 0.0));
