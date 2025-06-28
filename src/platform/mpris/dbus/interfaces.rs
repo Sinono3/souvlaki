@@ -1,15 +1,19 @@
 use std::{
+    collections::HashMap,
     convert::{TryFrom, TryInto},
     sync::{Arc, Mutex},
     time::Duration,
 };
 
-use dbus::Path;
+use dbus::{
+    arg::{RefArg, Variant},
+    Path,
+};
 use dbus_crossroads::{Crossroads, IfaceBuilder};
 
 use crate::{Loop, MediaControlEvent, MediaPlayback, MediaPosition, SeekDirection};
 
-use super::super::{create_metadata_dict, ServiceState};
+use super::super::ServiceState;
 
 // TODO: This type is super messed up, but it's the only way to get seeking working properly
 // on graphical media controls using dbus-crossroads.
@@ -194,7 +198,16 @@ where
         b.property("Metadata")
             .get({
                 let state = state.clone();
-                move |_, _| Ok(create_metadata_dict(&state.lock().unwrap().metadata))
+                move |_, _| {
+                    let state = state.lock().unwrap();
+                    // Manually clone...
+                    let metadata_dict: HashMap<_, _> = state
+                        .metadata_dict
+                        .iter()
+                        .map(|(k, v)| (k.to_owned(), Variant(v.box_clone())))
+                        .collect();
+                    Ok(metadata_dict)
+                }
             })
             .emits_changed_true();
 

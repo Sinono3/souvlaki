@@ -111,9 +111,9 @@ fn main() {
     // Windows platform
     #[cfg(target_os = "windows")]
     let config = {
-        use raw_window_handle::Win32WindowHandle;
+        use raw_window_handle::{HasRawWindowHandle, Win32WindowHandle};
 
-        let handle: Win32WindowHandle = unimplemented!();
+        let handle: Win32WindowHandle = window.raw_window_handle();
         souvlaki::platform::windows::WindowsConfig { hwnd: handle.hwnd }
     };
 
@@ -148,7 +148,7 @@ fn main() {
     // Set cover image (the value differs depending on the OS)
     // (To see how these differences are handled in application code, please
     // see the implementation of [`sample_data::cover`].)
-    controls.set_cover(cover.clone()).unwrap();
+    controls.set_cover(Some(cover.clone())).unwrap();
     // Set playback status.
     controls.set_playback(app.status.to_souvlaki()).unwrap();
 
@@ -191,7 +191,7 @@ fn main() {
                             controls
                                 .set_metadata(app.songs[app.song_index].clone())
                                 .unwrap();
-                            controls.set_cover(cover.clone()).unwrap();
+                            controls.set_cover(Some(cover.clone())).unwrap();
                             controls.set_playback(app.status.to_souvlaki()).unwrap();
                         }
                         Previous => {
@@ -201,7 +201,7 @@ fn main() {
                             controls
                                 .set_metadata(app.songs[app.song_index].clone())
                                 .unwrap();
-                            controls.set_cover(cover.clone()).unwrap();
+                            controls.set_cover(Some(cover.clone())).unwrap();
                             controls.set_playback(app.status.to_souvlaki()).unwrap();
                         }
                         Stop => {
@@ -279,7 +279,7 @@ fn main() {
                             controls
                                 .set_metadata(app.songs[app.song_index].clone())
                                 .unwrap();
-                            controls.set_cover(cover.clone()).unwrap();
+                            controls.set_cover(Some(cover.clone())).unwrap();
                             controls.set_playback(app.status.to_souvlaki()).unwrap();
                         }
                     }

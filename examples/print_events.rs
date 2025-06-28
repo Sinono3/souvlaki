@@ -40,9 +40,12 @@ fn main() {
         .attach(|event: MediaControlEvent| println!("Event received: {:?}", event))
         .unwrap();
 
+    // Set the cover art.
+    controls.set_cover(Some(sample_data::cover())).unwrap();
+
     // Update the media metadata.
     controls
-        .set_metadata(sample_data::album().clone()[6].clone())
+        .set_metadata(sample_data::album()[6].clone())
         .unwrap();
 
     loop {

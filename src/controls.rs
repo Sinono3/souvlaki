@@ -22,7 +22,7 @@ pub trait MediaControls: Sized + Debug {
     /// Set the metadata of the current media item.
     fn set_metadata(&mut self, metadata: MediaMetadata) -> Result<(), Self::Error>;
     /// Set the cover art/artwork/thumbnail of the current media item.
-    fn set_cover(&mut self, cover: Self::Cover) -> Result<(), Self::Error>;
+    fn set_cover(&mut self, cover: Option<Self::Cover>) -> Result<(), Self::Error>;
 }
 
 /// Wrapper around a specific OS implementation of media controls.
@@ -59,7 +59,7 @@ impl<T: MediaControls> MediaControlsWrapper<T> {
         self.inner.set_metadata(metadata)
     }
     /// Set the cover art/artwork/thumbnail of the current media item.
-    pub fn set_cover(&mut self, cover: T::Cover) -> Result<(), T::Error> {
+    pub fn set_cover(&mut self, cover: Option<T::Cover>) -> Result<(), T::Error> {
         self.inner.set_cover(cover)
     }
 }

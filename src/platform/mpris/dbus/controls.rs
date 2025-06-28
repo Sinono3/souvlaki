@@ -11,91 +11,29 @@ use std::thread;
 use std::time::Duration;
 
 use super::super::{
-    create_metadata_dict, InternalEvent, MprisConfig, MprisError, ServiceState, ServiceThreadHandle,
+    create_metadata_dict, InternalEvent, MprisCover, MprisError, ServiceState, ServiceThreadHandle,
 };
-use crate::{MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback};
+use crate::MediaControlEvent;
 
-/// A handle to OS media controls.
-pub struct Dbus {
-    thread: Option<ServiceThreadHandle>,
+pub(in super::super) fn spawn_thread<F>(
+    event_handler: F,
     dbus_name: String,
     friendly_name: String,
-}
+    event_channel: mpsc::Sender<InternalEvent>,
+    rx: mpsc::Receiver<InternalEvent>,
+) -> Result<ServiceThreadHandle, MprisError>
+where
+    F: Fn(MediaControlEvent) + Send + 'static,
+{
+    // Check if the connection can be created BEFORE spawning the new thread
+    let conn = Connection::new_session()?;
+    let name = format!("org.mpris.MediaPlayer2.{}", dbus_name);
+    conn.request_name(name, false, true, false)?;
 
-impl Dbus {
-    pub(in super::super) fn send_internal_event(
-        &mut self,
-        event: InternalEvent,
-    ) -> Result<(), MprisError> {
-        let thread = &self.thread.as_ref().ok_or(MprisError::ThreadNotRunning)?;
-        thread
-            .event_channel
-            .send(event)
-            .map_err(|_| MprisError::ThreadPanicked)
-    }
-}
-impl MediaControls for Dbus {
-    type Error = MprisError;
-    type PlatformConfig = MprisConfig;
-
-    fn new(config: Self::PlatformConfig) -> Result<Self, Self::Error> {
-        let Self::PlatformConfig {
-            dbus_name,
-            display_name,
-        } = config;
-
-        Ok(Self {
-            thread: None,
-            dbus_name: dbus_name.to_string(),
-            friendly_name: display_name.to_string(),
-        })
-    }
-
-    fn attach<F>(&mut self, event_handler: F) -> Result<(), Self::Error>
-    where
-        F: Fn(MediaControlEvent) + Send + 'static,
-    {
-        self.detach()?;
-
-        let dbus_name = self.dbus_name.clone();
-        let friendly_name = self.friendly_name.clone();
-        let (event_channel, rx) = mpsc::channel();
-
-        // Check if the connection can be created BEFORE spawning the new thread
-        let conn = Connection::new_session()?;
-        let name = format!("org.mpris.MediaPlayer2.{}", dbus_name);
-        conn.request_name(name, false, true, false)?;
-
-        self.thread = Some(ServiceThreadHandle {
-            event_channel,
-            thread: thread::spawn(move || run_service(conn, friendly_name, event_handler, rx)),
-        });
-        Ok(())
-    }
-
-    fn detach(&mut self) -> Result<(), Self::Error> {
-        if let Some(ServiceThreadHandle {
-            event_channel,
-            thread,
-        }) = self.thread.take()
-        {
-            // We don't care about the result of this event, since we immedieately
-            // check if the thread has panicked on the next line.
-            event_channel.send(InternalEvent::Kill).ok();
-            // One error in case the thread panics, and the other one in case the
-            // thread has returned an error.
-            thread.join().map_err(|_| MprisError::ThreadPanicked)??;
-        }
-        Ok(())
-    }
-
-    fn set_playback(&mut self, playback: MediaPlayback) -> Result<(), Self::Error> {
-        self.send_internal_event(InternalEvent::SetPlayback(playback))
-    }
-
-    fn set_metadata(&mut self, metadata: MediaMetadata) -> Result<(), Self::Error> {
-        self.send_internal_event(InternalEvent::SetMetadata(metadata))
-    }
+    Ok(ServiceThreadHandle {
+        event_channel,
+        thread: thread::spawn(move || run_service(conn, friendly_name, event_handler, rx)),
+    })
 }
 
 fn run_service<F>(
@@ -129,8 +67,22 @@ where
             match event {
                 InternalEvent::SetMetadata(metadata) => {
                     let mut state = state.lock().unwrap();
-                    state.metadata_dict = create_metadata_dict(&metadata);
+                    state.metadata_dict = create_metadata_dict(&metadata, &state.cover_url);
                     state.metadata = metadata;
+                    changed_properties.insert(
+                        "Metadata".to_owned(),
+                        Variant(state.metadata_dict.box_clone()),
+                    );
+                }
+                InternalEvent::SetCover(cover) => {
+                    let cover_url = if let Some(MprisCover::Url(cover_url)) = cover {
+                        Some(cover_url)
+                    } else {
+                        None
+                    };
+                    let mut state = state.lock().unwrap();
+                    state.metadata_dict = create_metadata_dict(&state.metadata, &cover_url);
+                    state.cover_url = cover_url;
                     changed_properties.insert(
                         "Metadata".to_owned(),
                         Variant(state.metadata_dict.box_clone()),

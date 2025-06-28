@@ -1,4 +1,4 @@
 mod interfaces;
 
 mod controls;
-pub use controls::Dbus;
+pub(super) use controls::spawn_thread;

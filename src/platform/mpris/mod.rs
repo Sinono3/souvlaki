@@ -8,13 +8,9 @@ compile_error!("feature \"dbus\" and feature \"zbus\" are mutually exclusive");
 
 #[cfg(feature = "zbus")]
 mod zbus;
-#[cfg(feature = "zbus")]
-pub use self::zbus::Zbus as Mpris;
 
 #[cfg(feature = "dbus")]
 mod dbus;
-#[cfg(feature = "dbus")]
-pub use self::dbus::Dbus as Mpris;
 
 /// MPRIS-specific configuration needed to create media controls.
 #[derive(Debug)]
@@ -44,7 +40,13 @@ pub enum MprisError {
     ThreadPanicked,
 }
 
+#[derive(Clone, Debug)]
+pub enum MprisCover {
+    Url(String),
+}
+
 use crate::{extensions::MprisPropertiesExt, Loop, MediaMetadata, MediaPlayback};
+use crate::{MediaControlEvent, MediaControls};
 use std::collections::HashMap;
 use std::{sync::mpsc, thread::JoinHandle};
 
@@ -56,6 +58,7 @@ struct ServiceThreadHandle {
 #[derive(Clone, Debug)]
 pub(crate) enum InternalEvent {
     SetMetadata(MediaMetadata),
+    SetCover(Option<MprisCover>),
     SetPlayback(MediaPlayback),
     SetLoopStatus(Loop),
     SetRate(f64),
@@ -81,6 +84,7 @@ struct ServiceState {
     shuffle: bool,
     metadata: MediaMetadata,
     metadata_dict: MetadataDict,
+    cover_url: Option<String>,
     volume: f64,
     maximum_rate: f64,
     minimum_rate: f64,
@@ -89,7 +93,7 @@ struct ServiceState {
 impl Default for ServiceState {
     fn default() -> Self {
         let metadata = Default::default();
-        let metadata_dict = create_metadata_dict(&metadata);
+        let metadata_dict = create_metadata_dict(&metadata, &None);
 
         Self {
             playback_status: MediaPlayback::Stopped,
@@ -98,10 +102,103 @@ impl Default for ServiceState {
             shuffle: false,
             metadata,
             metadata_dict,
+            cover_url: None,
             volume: 1.0,
             maximum_rate: 1.0,
             minimum_rate: 1.0,
         }
+    }
+}
+
+/// A handle to OS media controls.
+pub struct Mpris {
+    thread: Option<ServiceThreadHandle>,
+    dbus_name: String,
+    friendly_name: String,
+}
+
+impl Mpris {
+    pub(in super::super) fn send_internal_event(
+        &mut self,
+        event: InternalEvent,
+    ) -> Result<(), MprisError> {
+        let channel = &self
+            .thread
+            .as_ref()
+            .ok_or(MprisError::ThreadNotRunning)?
+            .event_channel;
+        channel.send(event).map_err(|_| MprisError::ThreadPanicked)
+    }
+}
+
+impl std::fmt::Debug for Mpris {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Mpris")?;
+        Ok(())
+    }
+}
+
+impl MediaControls for Mpris {
+    type Error = MprisError;
+    type PlatformConfig = MprisConfig;
+    type Cover = MprisCover;
+
+    fn new(config: Self::PlatformConfig) -> Result<Self, Self::Error> {
+        let Self::PlatformConfig {
+            dbus_name,
+            display_name,
+        } = config;
+
+        Ok(Self {
+            thread: None,
+            dbus_name: dbus_name.to_string(),
+            friendly_name: display_name.to_string(),
+        })
+    }
+
+    fn attach<F>(&mut self, event_handler: F) -> Result<(), Self::Error>
+    where
+        F: Fn(MediaControlEvent) + Send + 'static,
+    {
+        self.detach()?;
+
+        let dbus_name = self.dbus_name.clone();
+        let friendly_name = self.friendly_name.clone();
+        let (event_channel, rx) = mpsc::channel();
+
+        #[cfg(platform_mpris_dbus)]
+        let thread =
+            self::dbus::spawn_thread(event_handler, dbus_name, friendly_name, event_channel, rx)?;
+        #[cfg(platform_mpris_zbus)]
+        let thread =
+            self::zbus::spawn_thread(event_handler, dbus_name, friendly_name, event_channel, rx)?;
+
+        self.thread = Some(thread);
+        Ok(())
+    }
+
+    fn detach(&mut self) -> Result<(), Self::Error> {
+        if let Some(ServiceThreadHandle {
+            event_channel,
+            thread,
+        }) = self.thread.take()
+        {
+            event_channel.send(InternalEvent::Kill).ok();
+            thread.join().map_err(|_| Self::Error::ThreadPanicked)??;
+        }
+        Ok(())
+    }
+
+    fn set_playback(&mut self, playback: MediaPlayback) -> Result<(), Self::Error> {
+        self.send_internal_event(InternalEvent::SetPlayback(playback))
+    }
+
+    fn set_metadata(&mut self, metadata: MediaMetadata) -> Result<(), Self::Error> {
+        self.send_internal_event(InternalEvent::SetMetadata(metadata.into()))
+    }
+
+    fn set_cover(&mut self, cover: Option<Self::Cover>) -> Result<(), Self::Error> {
+        self.send_internal_event(InternalEvent::SetCover(cover))
     }
 }
 
@@ -154,7 +251,8 @@ macro_rules! build_metadata_dict {
     (
         wrap: $wrap:path,
         trackid_value: $trackid_value:expr,
-        metadata: $metadata:expr
+        metadata: $metadata:expr,
+        cover_url: $cover_url:expr,
     ) => {{
         let mut dict = MetadataDict::new();
 
@@ -184,32 +282,53 @@ macro_rules! build_metadata_dict {
 
         let mut insert = |k, v| dict.insert(k, v);
 
-        #[rustfmt::skip]
-        insert_if_some!(insert, $wrap,
-            // TODO: Cover URL missing here
-            // "mpris:artUrl", ...,
-            "xesam:title", title,
-            "xesam:artist", artists,
-            "xesam:album", album_title,
-            "xesam:albumArtist", album_artists,
-            "xesam:genre", genres,
-            "xesam:composer", composers,
-            "xesam:lyricist", lyricists,
-            "xesam:asText", lyrics,
-            "xesam:comment", comments,
-            "xesam:url", media_url,
-                                                                                                );
-                                                                                                use std::convert::TryFrom;
-        #[rustfmt::skip]
-        insert_if_some!(insert, $wrap, no_clone,
-            "mpris:length", duration.map(|length| i64::try_from(length.as_micros()).unwrap()),
-            "xesam:trackNumber", track_number,
-            "xesam:discNumber", disc_number,
-            "xesam:audioBPM", beats_per_minute,
-            "xesam:userRating", user_rating_01,
-            "xesam:autoRating", auto_rating,
-            "xesam:playCount", play_count,
-                                                                                                );
+        insert_if_some!(
+            insert,
+            $wrap,
+            "mpris:artUrl",
+            $cover_url,
+            "xesam:title",
+            title,
+            "xesam:artist",
+            artists,
+            "xesam:album",
+            album_title,
+            "xesam:albumArtist",
+            album_artists,
+            "xesam:genre",
+            genres,
+            "xesam:composer",
+            composers,
+            "xesam:lyricist",
+            lyricists,
+            "xesam:asText",
+            lyrics,
+            "xesam:comment",
+            comments,
+            "xesam:url",
+            media_url,
+        );
+
+        use std::convert::TryFrom;
+        insert_if_some!(
+            insert,
+            $wrap,
+            no_clone,
+            "mpris:length",
+            duration.map(|length| i64::try_from(length.as_micros()).unwrap()),
+            "xesam:trackNumber",
+            track_number,
+            "xesam:discNumber",
+            disc_number,
+            "xesam:audioBPM",
+            beats_per_minute,
+            "xesam:userRating",
+            user_rating_01,
+            "xesam:autoRating",
+            auto_rating,
+            "xesam:playCount",
+            play_count
+        );
 
         #[cfg(feature = "date")]
         {
@@ -226,7 +345,7 @@ macro_rules! build_metadata_dict {
     }};
 }
 
-fn create_metadata_dict(metadata: &MediaMetadata) -> MetadataDict {
+fn create_metadata_dict(metadata: &MediaMetadata, cover_url: &Option<String>) -> MetadataDict {
     #[cfg(platform_mpris_dbus)]
     {
         use ::dbus::arg::{RefArg, Variant};
@@ -238,7 +357,8 @@ fn create_metadata_dict(metadata: &MediaMetadata) -> MetadataDict {
         build_metadata_dict!(
             wrap: make_variant,
             trackid_value: Path::new("/").unwrap(),
-            metadata: metadata
+            metadata: metadata,
+            cover_url: cover_url,
         )
     }
 
@@ -254,8 +374,8 @@ fn create_metadata_dict(metadata: &MediaMetadata) -> MetadataDict {
         build_metadata_dict!(
             wrap: create_value,
             trackid_value: ObjectPath::try_from("/").unwrap(),
-            metadata: metadata
+            metadata: metadata,
+            cover_url: cover_url,
         )
     }
 }
-// pub(self) use {build_metadata_dict, insert_if_some};

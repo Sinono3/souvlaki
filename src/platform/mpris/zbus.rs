@@ -9,91 +9,29 @@ use zbus::{dbus_interface, ConnectionBuilder, SignalContext};
 use zvariant::ObjectPath;
 
 use super::{
-    create_metadata_dict, InternalEvent, MprisConfig, MprisError, ServiceState, ServiceThreadHandle,
+    create_metadata_dict, InternalEvent, MprisCover, MprisError, ServiceState, ServiceThreadHandle,
 };
 use crate::platform::mpris::MetadataDict;
 use crate::Loop;
-use crate::{
-    MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, SeekDirection,
-};
+use crate::{MediaControlEvent, MediaPlayback, MediaPosition, SeekDirection};
 
-/// A handle to OS media controls.
-pub struct Zbus {
-    thread: Option<ServiceThreadHandle>,
+pub(super) fn spawn_thread<F>(
+    event_handler: F,
     dbus_name: String,
     friendly_name: String,
-}
-
-impl Zbus {
-    pub(in super::super) fn send_internal_event(
-        &mut self,
-        event: InternalEvent,
-    ) -> Result<(), MprisError> {
-        let channel = &self
-            .thread
-            .as_ref()
-            .ok_or(MprisError::ThreadNotRunning)?
-            .event_channel;
-        channel.send(event).map_err(|_| MprisError::ThreadPanicked)
-    }
-}
-
-impl MediaControls for Zbus {
-    type Error = MprisError;
-    type PlatformConfig = MprisConfig;
-
-    fn new(config: Self::PlatformConfig) -> Result<Self, Self::Error> {
-        let Self::PlatformConfig {
-            dbus_name,
-            display_name,
-        } = config;
-
-        Ok(Self {
-            thread: None,
-            dbus_name: dbus_name.to_string(),
-            friendly_name: display_name.to_string(),
-        })
-    }
-
-    fn attach<F>(&mut self, event_handler: F) -> Result<(), Self::Error>
-    where
-        F: Fn(MediaControlEvent) + Send + 'static,
-    {
-        self.detach()?;
-
-        let dbus_name = self.dbus_name.clone();
-        let friendly_name = self.friendly_name.clone();
-        let (event_channel, rx) = mpsc::channel();
-
-        self.thread = Some(ServiceThreadHandle {
-            event_channel,
-            thread: thread::spawn(move || {
-                pollster::block_on(run_service(dbus_name, friendly_name, event_handler, rx))
-                    .map_err(|e| e.into())
-            }),
-        });
-        Ok(())
-    }
-
-    fn detach(&mut self) -> Result<(), Self::Error> {
-        if let Some(ServiceThreadHandle {
-            event_channel,
-            thread,
-        }) = self.thread.take()
-        {
-            event_channel.send(InternalEvent::Kill).ok();
-            thread.join().map_err(|_| Self::Error::ThreadPanicked)??;
-        }
-        Ok(())
-    }
-
-    fn set_playback(&mut self, playback: MediaPlayback) -> Result<(), Self::Error> {
-        self.send_internal_event(InternalEvent::SetPlayback(playback))
-    }
-
-    fn set_metadata(&mut self, metadata: MediaMetadata) -> Result<(), Self::Error> {
-        self.send_internal_event(InternalEvent::SetMetadata(metadata.into()))
-    }
+    event_channel: mpsc::Sender<InternalEvent>,
+    rx: mpsc::Receiver<InternalEvent>,
+) -> Result<ServiceThreadHandle, MprisError>
+where
+    F: Fn(MediaControlEvent) + Send + 'static,
+{
+    Ok(ServiceThreadHandle {
+        event_channel,
+        thread: thread::spawn(move || {
+            pollster::block_on(run_service(dbus_name, friendly_name, event_handler, rx))
+                .map_err(|e| e.into())
+        }),
+    })
 }
 
 struct AppInterface {
@@ -364,8 +302,21 @@ where
 
             match event {
                 InternalEvent::SetMetadata(metadata) => {
-                    interface.state.metadata_dict = create_metadata_dict(&metadata);
+                    interface.state.metadata_dict =
+                        create_metadata_dict(&metadata, &interface.state.cover_url);
                     interface.state.metadata = metadata;
+                    interface.metadata_changed(&ctxt).await?;
+                }
+                InternalEvent::SetCover(cover) => {
+                    let cover_url = if let Some(MprisCover::Url(cover_url)) = cover {
+                        Some(cover_url)
+                    } else {
+                        None
+                    };
+
+                    interface.state.metadata_dict =
+                        create_metadata_dict(&interface.state.metadata, &cover_url);
+                    interface.state.cover_url = cover_url;
                     interface.metadata_changed(&ctxt).await?;
                 }
                 InternalEvent::SetPlayback(playback) => {
