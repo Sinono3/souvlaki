@@ -36,7 +36,7 @@ pub struct WindowsConfig {
 
 // TODO: Implement debug properly
 /// Definition/reference to cover art for Windows.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum WindowsCover {
     /// Loads the image via [`RandomAccessStreamReference.CreateFromUri`](https://learn.microsoft.com/en-us/uwp/api/windows.storage.streams.randomaccessstreamreference.createfromuri?view=winrt-26100#windows-storage-streams-randomaccessstreamreference-createfromuri(windows-foundation-uri))
     Uri(String),
@@ -44,6 +44,16 @@ pub enum WindowsCover {
     LocalFile(PathBuf),
     /// Loads the image via [`RandomAccessStreamReference.CreateFromStream`](https://learn.microsoft.com/en-us/uwp/api/windows.storage.streams.randomaccessstreamreference.createfromstream?view=winrt-26100#windows-storage-streams-randomaccessstreamreference-createfromstream(windows-storage-streams-irandomaccessstream))
     Bytes(Vec<u8>),
+}
+
+impl std::fmt::Debug for WindowsCover {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            WindowsCover::Uri(uri) => f.write_fmt(format_args!("Uri({uri:?})")),
+            WindowsCover::LocalFile(path) => f.write_fmt(format_args!("LocalFile({path:?})")),
+            WindowsCover::Bytes(_) => f.write_str("Bytes(<binary>)"),
+        }
+    }
 }
 
 #[repr(i32)]

@@ -41,24 +41,32 @@ pub type OsImpl = Apple;
 /// Definition/reference to cover art for Apple platforms.
 /// Differs depending on whether it's macOS or iOS.
 #[cfg(platform_macos)]
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum AppleCover {
     /// Available only on macOS.
     /// May work with HTTP URLs, data URLs, file URLs. Hasn't been tested with others.
     #[cfg(platform_macos)]
     Url(String),
     /// Available on macOS/iOS.
-    /// If the file is not found, it will silently fail and display a blank
-    /// image as the artwork.
-    /// As of currently, receiving errors from
-    /// async calls to macOS is not implemented.
+    /// If the file is not found,
+    /// it will silently fail and display a blank image as the artwork.
+    /// As of currently, receiving errors from async calls to macOS is not implemented.
     LocalFile(PathBuf),
     /// Available on macOS/iOS.
     /// If the bytes are not recognized as an image,
     /// it will silently fail and display a blank image as the artwork.
-    /// As of currently, receiving errors from
-    /// async calls to macOS is not implemented.
+    /// As of currently, receiving errors from async calls to macOS is not implemented.
     Bytes(Vec<u8>),
+}
+
+impl std::fmt::Debug for AppleCover {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AppleCover::Url(url) => f.write_fmt(format_args!("Url({url:?})")),
+            AppleCover::LocalFile(path) => f.write_fmt(format_args!("LocalFile({path:?})")),
+            AppleCover::Bytes(_) => f.write_str("Bytes(<binary>)"),
+        }
+    }
 }
 
 impl MediaControls for Apple {
