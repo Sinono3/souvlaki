@@ -7,7 +7,7 @@ description = "A cross-platform media key and metadata handling library."
 repository = "https://github.com/Sinono3/souvlaki"
 documentation = "https://docs.rs/souvlaki"
 license = "MIT"
-rust-version = "1.67"
+rust-version = "1.74"
 
 [features]
 default = ["mpris_dbus", "mpris_base64_data_url"]
@@ -40,14 +40,18 @@ thiserror = "1.0"
 
 # Windows deps
 [target.'cfg(target_os = "windows")'.dependencies.windows]
-version = "0.44"
+version = "0.61"
 features = [
 	"Foundation",
+	"Foundation_Collections",
 	"Media",
 	"Win32_Foundation",
 	"Win32_System_WinRT",
 	"Storage_Streams",
 ]
+
+[target.'cfg(target_os = "windows")'.dependencies.windows-collections]
+version = "0.2"
 
 [dev-dependencies]
 winit = "0.27.0"

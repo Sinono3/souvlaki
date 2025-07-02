@@ -16,6 +16,8 @@ Types of changes:
 
 ## [Unreleased]
 
+- MSRV increased to 1.74 (due to `windows-collections`)
+
 ## [0.8.3]
 
 ### Added
