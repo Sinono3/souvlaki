@@ -3,26 +3,33 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use ::windows::core::HSTRING;
-use ::windows::Foundation::{EventRegistrationToken, TimeSpan, TypedEventHandler, Uri};
-use ::windows::Media::*;
-use ::windows::Storage::Streams::RandomAccessStreamReference;
-use ::windows::Win32::Foundation::HWND;
-use ::windows::Win32::System::WinRT::ISystemMediaTransportControlsInterop;
-use windows::core::Interface;
+use windows::core::{Interface, Ref, HSTRING};
+use windows::Foundation::{TimeSpan, TypedEventHandler, Uri};
+use windows::Media::*;
+use windows::Storage::Streams::RandomAccessStreamReference;
 use windows::Storage::Streams::{DataWriter, IRandomAccessStream, InMemoryRandomAccessStream};
+use windows::Win32::Foundation::HWND;
+use windows::Win32::System::WinRT::ISystemMediaTransportControlsInterop;
 
 use crate::{
-    MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, SeekDirection,
+    MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition,
+    MediaTypeWindows, SeekDirection,
 };
 
-pub use ::windows::core::Error as WindowsError;
+pub use windows::core::Error as WindowsError;
+
+#[derive(Debug)]
+struct Handlers {
+    button: i64,
+    playback_position: i64,
+    playback_rate: i64,
+}
 
 /// A handle to Windows' SystemMediaTransportControls
 #[derive(Debug)]
 pub struct Windows {
     controls: SystemMediaTransportControls,
-    button_handler_token: Option<EventRegistrationToken>,
+    handlers: Option<Handlers>,
     display_updater: SystemMediaTransportControlsDisplayUpdater,
     timeline_properties: SystemMediaTransportControlsTimelineProperties,
 }
@@ -75,7 +82,7 @@ impl MediaControls for Windows {
             ISystemMediaTransportControlsInterop,
         >()?;
         let controls: SystemMediaTransportControls =
-            unsafe { interop.GetForWindow(HWND(config.hwnd as isize)) }?;
+            unsafe { interop.GetForWindow(HWND(config.hwnd)) }?;
         let display_updater = controls.DisplayUpdater()?;
         let timeline_properties = SystemMediaTransportControlsTimelineProperties::new()?;
 
@@ -83,7 +90,7 @@ impl MediaControls for Windows {
             controls,
             display_updater,
             timeline_properties,
-            button_handler_token: None,
+            handlers: None,
         })
     }
 
@@ -100,17 +107,13 @@ impl MediaControls for Windows {
         self.controls.SetIsFastForwardEnabled(true)?;
         self.controls.SetIsRewindEnabled(true)?;
 
-        // TODO: allow changing this
-        self.display_updater.SetType(MediaPlaybackType::Music)?;
-
         let event_handler = Arc::new(Mutex::new(event_handler));
 
         let button_handler = TypedEventHandler::new({
             let event_handler = event_handler.clone();
 
-            move |_, args: &Option<_>| {
-                let args: &SystemMediaTransportControlsButtonPressedEventArgs =
-                    args.as_ref().unwrap();
+            move |_, args: Ref<SystemMediaTransportControlsButtonPressedEventArgs>| {
+                let args = (*args).as_ref().unwrap();
                 let button = args.Button()?;
 
                 // We cannot match on these...
@@ -137,11 +140,11 @@ impl MediaControls for Windows {
                 Ok(())
             }
         });
-        self.button_handler_token = Some(self.controls.ButtonPressed(&button_handler)?);
 
         let position_handler = TypedEventHandler::new({
-            move |_, args: &Option<_>| {
-                let args: &PlaybackPositionChangeRequestedEventArgs = args.as_ref().unwrap();
+            let event_handler = event_handler.clone();
+            move |_, args: Ref<PlaybackPositionChangeRequestedEventArgs>| {
+                let args = (*args).as_ref().unwrap();
                 let position = Duration::from(args.RequestedPlaybackPosition()?);
 
                 (event_handler.lock().unwrap())(MediaControlEvent::SetPosition(MediaPosition(
@@ -150,17 +153,37 @@ impl MediaControls for Windows {
                 Ok(())
             }
         });
-        self.controls
-            .PlaybackPositionChangeRequested(&position_handler)?;
+
+        let rate_handler = TypedEventHandler::new({
+            move |_, args: Ref<PlaybackRateChangeRequestedEventArgs>| {
+                let args = (*args).as_ref().unwrap();
+                let rate = args.RequestedPlaybackRate()?;
+                (event_handler.lock().unwrap())(MediaControlEvent::SetPlaybackRate(rate));
+                Ok(())
+            }
+        });
+
+        self.handlers = Some(Handlers {
+            button: self.controls.ButtonPressed(&button_handler)?,
+            playback_position: self
+                .controls
+                .PlaybackPositionChangeRequested(&position_handler)?,
+            playback_rate: self.controls.PlaybackRateChangeRequested(&rate_handler)?,
+        });
 
         Ok(())
     }
 
     fn detach(&mut self) -> Result<(), Self::Error> {
         self.controls.SetIsEnabled(false)?;
-        if let Some(button_handler_token) = self.button_handler_token {
-            self.controls.RemoveButtonPressed(button_handler_token)?;
+        if let Some(ref handlers) = self.handlers {
+            self.controls.RemoveButtonPressed(handlers.button)?;
+            self.controls
+                .RemovePlaybackPositionChangeRequested(handlers.playback_position)?;
+            self.controls
+                .RemovePlaybackRateChangeRequested(handlers.playback_rate)?;
         }
+        self.handlers = None;
         Ok(())
     }
 
@@ -190,18 +213,75 @@ impl MediaControls for Windows {
     }
 
     fn set_metadata(&mut self, metadata: MediaMetadata) -> Result<(), Self::Error> {
-        let properties = self.display_updater.MusicProperties()?;
+        macro_rules! meta {
+            ($properties:ident, $method:ident, $value:expr, ref $wrap:expr) => {
+                if let Some(ref value) = $value {
+                    $properties.$method(&$wrap(value.clone()))?;
+                }
+            };
 
-        if let Some(title) = metadata.title {
-            properties.SetTitle(&HSTRING::from(title))?;
+            ($properties:ident, $method:ident, $value:expr, $wrap:expr) => {
+                if let Some(ref value) = $value {
+                    $properties.$method($wrap(value.clone()))?;
+                }
+            };
         }
-        if let Some(artist) = metadata.artist {
-            properties.SetArtist(&HSTRING::from(artist))?;
+
+        let MediaMetadata {
+            title,
+            artist,
+            album_title,
+            album_artist,
+            genres,
+            track_number,
+            album_track_count,
+            duration,
+            media_type_windows,
+            app_media_id,
+            subtitle,
+            ..
+        } = metadata;
+
+        let display = &self.display_updater;
+        let music = display.MusicProperties()?;
+        let image = display.ImageProperties()?;
+        let video = display.VideoProperties()?;
+        let h = |x| HSTRING::from(x);
+        let to_u32 = |x| (x as u32);
+
+        display.SetType(
+            media_type_windows
+                .unwrap_or(MediaTypeWindows::Music)
+                .into_native(),
+        )?;
+        meta!(display, SetAppMediaId, app_media_id, ref h);
+        meta!(music, SetTitle, title, ref h);
+        meta!(music, SetArtist, artist, ref h);
+        meta!(music, SetAlbumTitle, album_title, ref h);
+        meta!(music, SetAlbumArtist, album_artist, ref h);
+        meta!(music, SetTrackNumber, track_number, to_u32);
+        meta!(music, SetAlbumTrackCount, album_track_count, to_u32);
+        meta!(video, SetTitle, title, ref h);
+        meta!(video, SetSubtitle, subtitle, ref h);
+        meta!(image, SetTitle, title, ref h);
+        meta!(image, SetSubtitle, subtitle, ref h);
+
+        // TODO: We should allow setting shared Image and Video genres separately.
+        if let Some(genres) = genres {
+            let genres = genres.into_iter().map(|x| HSTRING::from(x));
+            let genres_windows_music = music.Genres()?;
+            let genres_windows_video = video.Genres()?;
+
+            // Kinda clunky, but ok.
+            genres_windows_music.Clear()?;
+            genres_windows_video.Clear()?;
+            for genre in genres {
+                genres_windows_music.Append(&genre)?;
+                genres_windows_video.Append(&genre)?;
+            }
         }
-        if let Some(album_title) = metadata.album_title {
-            properties.SetAlbumTitle(&HSTRING::from(album_title))?;
-        }
-        let duration = metadata.duration.unwrap_or_default();
+
+        let duration = duration.unwrap_or_default();
         self.timeline_properties.SetStartTime(TimeSpan::default())?;
         self.timeline_properties
             .SetMinSeekTime(TimeSpan::default())?;
@@ -212,7 +292,7 @@ impl MediaControls for Windows {
 
         self.controls
             .UpdateTimelineProperties(&self.timeline_properties)?;
-        self.display_updater.Update()?;
+        display.Update()?;
         Ok(())
     }
 
@@ -237,6 +317,7 @@ impl MediaControls for Windows {
             None => todo!(),
         };
         self.display_updater.SetThumbnail(&stream)?;
+        self.display_updater.Update()?;
         Ok(())
     }
 }
@@ -252,4 +333,15 @@ fn create_stream_from_bytes(data: Vec<u8>) -> Result<IRandomAccessStream, Window
     output_stream.Close()?;
 
     Ok(stream.cast::<IRandomAccessStream>()?)
+}
+
+impl MediaTypeWindows {
+    pub fn into_native(self) -> MediaPlaybackType {
+        match self {
+            MediaTypeWindows::Unknown => MediaPlaybackType::Unknown,
+            MediaTypeWindows::Music => MediaPlaybackType::Music,
+            MediaTypeWindows::Video => MediaPlaybackType::Video,
+            MediaTypeWindows::Image => MediaPlaybackType::Image,
+        }
+    }
 }

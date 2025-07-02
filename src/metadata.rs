@@ -336,6 +336,14 @@ pub struct MediaMetadata {
     /// - **MPRIS:** Unsupported
     /// - **macOS/iOS:** Unsupported
     /// - **Windows:** `SystemMediaTransportControlsDisplayUpdater.Type`
+    ///
+    /// From the Windows docs:
+    ///
+    /// > ### Note
+    /// > Apps should set a value for the Type property even if they aren't supplying other
+    /// > media metadata to be displayed by the System Media Transport Controls. This value
+    /// > helps the system handle your media content correctly, including preventing the
+    /// > screen saver from activating during playback.
     pub media_type_windows: Option<MediaTypeWindows>,
 
     /// "Gets or sets the media id of the app."
