@@ -12,8 +12,8 @@ use windows::Win32::Foundation::HWND;
 use windows::Win32::System::WinRT::ISystemMediaTransportControlsInterop;
 
 use crate::{
-    Loop, MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition,
-    MediaTypeWindows, SeekDirection,
+    MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition,
+    MediaTypeWindows, Repeat, SeekDirection,
 };
 
 pub use windows::core::Error as WindowsError;
@@ -180,8 +180,8 @@ impl MediaControls for Windows {
             move |_, args: Ref<AutoRepeatModeChangeRequestedEventArgs>| {
                 let args = (*args).as_ref().unwrap();
                 let repeat = args.RequestedAutoRepeatMode()?;
-                if let Some(repeat) = Loop::from_native(repeat) {
-                    (event_handler.lock().unwrap())(MediaControlEvent::SetLoop(repeat));
+                if let Some(repeat) = Repeat::from_native(repeat) {
+                    (event_handler.lock().unwrap())(MediaControlEvent::SetRepeat(repeat));
                 }
                 Ok(())
             }
@@ -380,23 +380,23 @@ impl MediaTypeWindows {
     }
 }
 
-impl Loop {
+impl Repeat {
     fn from_native(mode: MediaPlaybackAutoRepeatMode) -> Option<Self> {
         if mode == MediaPlaybackAutoRepeatMode::None {
-            Some(Loop::None)
+            Some(Repeat::None)
         } else if mode == MediaPlaybackAutoRepeatMode::Track {
-            Some(Loop::Track)
+            Some(Repeat::Track)
         } else if mode == MediaPlaybackAutoRepeatMode::List {
-            Some(Loop::Playlist)
+            Some(Repeat::Playlist)
         } else {
             None
         }
     }
     fn into_native(self) -> MediaPlaybackAutoRepeatMode {
         match self {
-            Loop::None => MediaPlaybackAutoRepeatMode::None,
-            Loop::Track => MediaPlaybackAutoRepeatMode::Track,
-            Loop::Playlist => MediaPlaybackAutoRepeatMode::List,
+            Repeat::None => MediaPlaybackAutoRepeatMode::None,
+            Repeat::Track => MediaPlaybackAutoRepeatMode::Track,
+            Repeat::Playlist => MediaPlaybackAutoRepeatMode::List,
         }
     }
 }

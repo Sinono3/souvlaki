@@ -11,7 +11,7 @@ use dbus::{
 };
 use dbus_crossroads::{Crossroads, IfaceBuilder};
 
-use crate::{Loop, MediaControlEvent, MediaPlayback, MediaPosition, SeekDirection};
+use crate::{MediaControlEvent, MediaPlayback, MediaPosition, Repeat, SeekDirection};
 
 use super::super::ServiceState;
 
@@ -151,11 +151,11 @@ where
             .set({
                 let event_handler = event_handler.clone();
                 move |_, _, loop_status_dbus: String| {
-                    let Some(loop_status) = Loop::from_dbus_value(&loop_status_dbus) else {
+                    let Some(repeat) = Repeat::from_dbus_value(&loop_status_dbus) else {
                         // If invalid, just ignore it
                         return Ok(None);
                     };
-                    (event_handler.lock().unwrap())(MediaControlEvent::SetLoop(loop_status));
+                    (event_handler.lock().unwrap())(MediaControlEvent::SetRepeat(repeat));
                     Ok(Some(loop_status_dbus))
                 }
             })

@@ -75,7 +75,7 @@ impl MprisCover {
     }
 }
 
-use crate::{extensions::MprisPropertiesExt, Loop, MediaMetadata, MediaPlayback};
+use crate::{extensions::MprisPropertiesExt, MediaMetadata, MediaPlayback, Repeat};
 use crate::{MediaControlEvent, MediaControls};
 use std::collections::HashMap;
 use std::{sync::mpsc, thread::JoinHandle};
@@ -90,7 +90,7 @@ pub(crate) enum InternalEvent {
     SetMetadata(MediaMetadata),
     SetCover(Option<MprisCover>),
     SetPlayback(MediaPlayback),
-    SetLoopStatus(Loop),
+    SetLoopStatus(Repeat),
     SetRate(f64),
     SetShuffle(bool),
     SetVolume(f64),
@@ -109,7 +109,7 @@ type MetadataDict = HashMap<String, ::zbus::zvariant::OwnedValue>;
 #[derive(Debug)]
 struct ServiceState {
     playback_status: MediaPlayback,
-    loop_status: Loop,
+    loop_status: Repeat,
     rate: f64,
     shuffle: bool,
     metadata: MediaMetadata,
@@ -127,7 +127,7 @@ impl Default for ServiceState {
 
         Self {
             playback_status: MediaPlayback::Stopped,
-            loop_status: Loop::None,
+            loop_status: Repeat::None,
             rate: 1.0,
             shuffle: false,
             metadata,
@@ -233,7 +233,7 @@ impl MediaControls for Mpris {
 }
 
 impl MprisPropertiesExt for Mpris {
-    fn set_loop_status(&mut self, loop_status: Loop) -> Result<(), Self::Error> {
+    fn set_loop_status(&mut self, loop_status: Repeat) -> Result<(), Self::Error> {
         self.send_internal_event(InternalEvent::SetLoopStatus(loop_status))
     }
 

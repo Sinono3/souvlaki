@@ -6,8 +6,7 @@ use std::time::Duration;
 use zbus::interface;
 
 use super::super::{MetadataDict, ServiceState};
-use crate::Loop;
-use crate::{MediaControlEvent, MediaPlayback, MediaPosition, SeekDirection};
+use crate::{MediaControlEvent, MediaPlayback, MediaPosition, Repeat, SeekDirection};
 
 pub(super) struct AppInterface {
     pub friendly_name: String,
@@ -141,8 +140,8 @@ impl PlayerInterface {
 
     #[zbus(property)]
     fn set_loop_status(&self, loop_status: &str) {
-        if let Some(loop_status) = Loop::from_dbus_value(loop_status) {
-            self.send_event(MediaControlEvent::SetLoop(loop_status));
+        if let Some(repeat) = Repeat::from_dbus_value(loop_status) {
+            self.send_event(MediaControlEvent::SetRepeat(repeat));
         }
     }
 

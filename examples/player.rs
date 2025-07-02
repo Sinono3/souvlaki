@@ -238,7 +238,7 @@ fn main() {
                         SetVolume(_) => todo!(),
                         SetRate(_) => todo!(),
                         SetShuffle(_) => todo!(),
-                        SetLoop(_) => todo!(),
+                        SetRepeat(_) => todo!(),
                         OpenUri(_) => {
                             eprintln!("This example player does not support opening URIs");
                         }

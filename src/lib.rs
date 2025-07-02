@@ -48,11 +48,11 @@ pub enum MediaControlEvent {
     /// [`MediaControls::set_shuffle`] must be called. Note that
     /// this must be done only with the MPRIS backend.
     SetShuffle(bool),
-    /// Set loop status of the media item: (none, loop track, loop playlist)
+    /// Set repeat mode of the media item: (none, track, playlist)
     /// **NOTE**: If the event was received and correctly handled,
     /// [`MediaControls::set_loop`] must be called. Note that
     /// this must be done only with the MPRIS backend.
-    SetLoop(Loop),
+    SetRepeat(Repeat),
 
     /// Open the URI in the media player.
     OpenUri(String),
@@ -86,7 +86,7 @@ impl MediaPlayback {
 
 /// A repeat/loop status
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum Loop {
+pub enum Repeat {
     /// - **MPRIS**: The playback will stop when there are no more tracks to play
     None,
     /// - **MPRIS**: The current track will start again from the begining once it has finished playing
@@ -95,9 +95,9 @@ pub enum Loop {
     Playlist,
 }
 
-impl Loop {
+impl Repeat {
     pub fn to_dbus_value(self) -> &'static str {
-        use Loop::*;
+        use Repeat::*;
         match self {
             None => "None",
             Track => "Track",
@@ -105,7 +105,7 @@ impl Loop {
         }
     }
     pub fn from_dbus_value(x: &str) -> Option<Self> {
-        use Loop::*;
+        use Repeat::*;
         match x {
             "None" => Some(None),
             "Track" => Some(Track),
