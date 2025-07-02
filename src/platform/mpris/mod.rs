@@ -102,7 +102,7 @@ pub(crate) enum InternalEvent {
 #[cfg(platform_mpris_dbus)]
 type MetadataDict = HashMap<String, ::dbus::arg::Variant<Box<dyn ::dbus::arg::RefArg>>>;
 #[cfg(platform_mpris_zbus)]
-type MetadataDict = HashMap<String, zvariant::OwnedValue>;
+type MetadataDict = HashMap<String, ::zbus::zvariant::OwnedValue>;
 
 // TODO: This is public only due to how rust modules work...
 // should not actually be seen by the library user
@@ -394,11 +394,14 @@ fn create_metadata_dict(metadata: &MediaMetadata, cover_url: &Option<String>) ->
 
     #[cfg(platform_mpris_zbus)]
     {
-        use zvariant::{ObjectPath, Value};
-        fn create_value<'a, T: Into<zvariant::Value<'a>> + zvariant::DynamicType>(
+        use ::zbus::zvariant::{ObjectPath, Value};
+        fn create_value<
+            'a,
+            T: Into<::zbus::zvariant::Value<'a>> + ::zbus::zvariant::DynamicType,
+        >(
             x: T,
-        ) -> zvariant::OwnedValue {
-            Value::new(x).to_owned()
+        ) -> ::zbus::zvariant::OwnedValue {
+            Value::new(x).try_to_owned().unwrap()
         }
 
         build_metadata_dict!(

@@ -3,8 +3,8 @@ use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use zbus::{ConnectionBuilder, SignalContext};
-use zvariant::ObjectPath;
+use zbus::zvariant::ObjectPath;
+use zbus::connection;
 
 use super::super::{
     create_metadata_dict, InternalEvent, MprisCover, MprisError, ServiceState, ServiceThreadHandle,
@@ -53,7 +53,7 @@ where
 
     let name = format!("org.mpris.MediaPlayer2.{dbus_name}");
     let path = ObjectPath::try_from("/org/mpris/MediaPlayer2").unwrap();
-    let connection = ConnectionBuilder::session()?
+    let connection = connection::Builder::session()?
         .serve_at(&path, app)?
         .serve_at(&path, player)?
         .name(name.as_str())?
@@ -67,49 +67,49 @@ where
                 .interface::<_, PlayerInterface>(&path)
                 .await?;
             let mut interface = interface_ref.get_mut().await;
-            let ctxt = SignalContext::new(&connection, &path)?;
+            let emitter = interface_ref.signal_emitter();
 
             match event {
                 InternalEvent::SetMetadata(metadata) => {
                     interface.state.metadata_dict =
                         create_metadata_dict(&metadata, &interface.state.cover_url);
                     interface.state.metadata = metadata;
-                    interface.metadata_changed(&ctxt).await?;
+                    interface.metadata_changed(&emitter).await?;
                 }
                 InternalEvent::SetCover(cover) => {
                     let cover_url = MprisCover::to_url(cover);
                     interface.state.metadata_dict =
                         create_metadata_dict(&interface.state.metadata, &cover_url);
                     interface.state.cover_url = cover_url;
-                    interface.metadata_changed(&ctxt).await?;
+                    interface.metadata_changed(&emitter).await?;
                 }
                 InternalEvent::SetPlayback(playback) => {
                     interface.state.playback_status = playback;
-                    interface.playback_status_changed(&ctxt).await?;
+                    interface.playback_status_changed(&emitter).await?;
                 }
                 InternalEvent::SetLoopStatus(loop_status) => {
                     interface.state.loop_status = loop_status;
-                    interface.loop_status_changed(&ctxt).await?;
+                    interface.loop_status_changed(&emitter).await?;
                 }
                 InternalEvent::SetRate(rate) => {
                     interface.state.rate = rate;
-                    interface.rate_changed(&ctxt).await?;
+                    interface.rate_changed(&emitter).await?;
                 }
                 InternalEvent::SetShuffle(shuffle) => {
                     interface.state.shuffle = shuffle;
-                    interface.shuffle_changed(&ctxt).await?;
+                    interface.shuffle_changed(&emitter).await?;
                 }
                 InternalEvent::SetVolume(volume) => {
                     interface.state.volume = volume;
-                    interface.volume_changed(&ctxt).await?;
+                    interface.volume_changed(&emitter).await?;
                 }
                 InternalEvent::SetMaximumRate(rate) => {
                     interface.state.maximum_rate = rate;
-                    interface.maximum_rate_changed(&ctxt).await?;
+                    interface.maximum_rate_changed(&emitter).await?;
                 }
                 InternalEvent::SetMinimumRate(rate) => {
                     interface.state.minimum_rate = rate;
-                    interface.minimum_rate_changed(&ctxt).await?;
+                    interface.minimum_rate_changed(&emitter).await?;
                 }
                 InternalEvent::Kill => return Ok(()),
             }

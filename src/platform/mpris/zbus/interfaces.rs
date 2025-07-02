@@ -3,7 +3,7 @@ use std::convert::TryInto;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use zbus::dbus_interface;
+use zbus::interface;
 
 use super::super::{MetadataDict, ServiceState};
 use crate::Loop;
@@ -14,7 +14,7 @@ pub(super) struct AppInterface {
     pub event_handler: Arc<Mutex<dyn Fn(MediaControlEvent) + Send + 'static>>,
 }
 
-#[dbus_interface(name = "org.mpris.MediaPlayer2")]
+#[interface(name = "org.mpris.MediaPlayer2")]
 impl AppInterface {
     fn raise(&self) {
         self.send_event(MediaControlEvent::Raise);
@@ -23,32 +23,32 @@ impl AppInterface {
         self.send_event(MediaControlEvent::Quit);
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn can_quit(&self) -> bool {
         true
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn can_raise(&self) -> bool {
         true
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn has_tracklist(&self) -> bool {
         false
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn identity(&self) -> &str {
         &self.friendly_name
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn supported_uri_schemes(&self) -> &[&str] {
         &[]
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn supported_mime_types(&self) -> &[&str] {
         &[]
     }
@@ -71,7 +71,7 @@ impl PlayerInterface {
     }
 }
 
-#[dbus_interface(name = "org.mpris.MediaPlayer2.Player")]
+#[interface(name = "org.mpris.MediaPlayer2.Player")]
 impl PlayerInterface {
     fn next(&self) {
         self.send_event(MediaControlEvent::Next);
@@ -108,7 +108,7 @@ impl PlayerInterface {
         // NOTE: Should the `Seeked` signal be called when calling this method?
     }
 
-    fn set_position(&self, _track_id: zvariant::ObjectPath, position: i64) {
+    fn set_position(&self, _track_id: zbus::zvariant::ObjectPath, position: i64) {
         if let Ok(micros) = position.try_into() {
             if let Some(duration) = self.state.metadata.duration {
                 // If the Position argument is greater than the track length, do nothing.
@@ -129,59 +129,59 @@ impl PlayerInterface {
 
     // TODO: Seeked signal missing
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn playback_status(&self) -> &'static str {
         self.state.playback_status.to_dbus_value()
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn loop_status(&self) -> &'static str {
         self.state.loop_status.to_dbus_value()
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn set_loop_status(&self, loop_status: &str) {
         if let Some(loop_status) = Loop::from_dbus_value(loop_status) {
             self.send_event(MediaControlEvent::SetLoop(loop_status));
         }
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn rate(&self) -> f64 {
         self.state.rate
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn set_rate(&self, rate: f64) {
         self.send_event(MediaControlEvent::SetRate(rate));
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn shuffle(&self) -> bool {
         self.state.shuffle
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn set_shuffle(&self, shuffle: bool) {
         self.send_event(MediaControlEvent::SetShuffle(shuffle));
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn metadata(&self) -> MetadataDict {
         self.state.metadata_dict.clone()
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn volume(&self) -> f64 {
         self.state.volume
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn set_volume(&self, volume: f64) {
         self.send_event(MediaControlEvent::SetVolume(volume));
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn position(&self) -> i64 {
         let position = match self.state.playback_status {
             MediaPlayback::Playing {
@@ -196,42 +196,42 @@ impl PlayerInterface {
         position.try_into().unwrap_or(0)
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn maximum_rate(&self) -> f64 {
         self.state.maximum_rate
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn minimum_rate(&self) -> f64 {
         self.state.minimum_rate
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn can_go_next(&self) -> bool {
         true
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn can_go_previous(&self) -> bool {
         true
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn can_play(&self) -> bool {
         true
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn can_pause(&self) -> bool {
         true
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn can_seek(&self) -> bool {
         true
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn can_control(&self) -> bool {
         true
     }
