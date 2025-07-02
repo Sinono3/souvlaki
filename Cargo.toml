@@ -7,7 +7,7 @@ description = "A cross-platform media key and metadata handling library."
 repository = "https://github.com/Sinono3/souvlaki"
 documentation = "https://docs.rs/souvlaki"
 license = "MIT"
-rust-version = "1.74"
+rust-version = "1.77"
 
 [features]
 default = ["mpris_dbus", "mpris_base64_data_url"]

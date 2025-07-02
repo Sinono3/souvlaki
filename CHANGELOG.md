@@ -16,7 +16,7 @@ Types of changes:
 
 ## [Unreleased]
 
-- MSRV increased to 1.74 (due to `windows-collections`)
+- MSRV increased to 1.77 (due to `windows` and `zbus`)
 
 ## [0.8.3]
 
