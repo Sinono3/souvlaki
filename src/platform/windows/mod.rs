@@ -12,7 +12,7 @@ use windows::Win32::Foundation::HWND;
 use windows::Win32::System::WinRT::ISystemMediaTransportControlsInterop;
 
 use crate::{
-    MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition,
+    Loop, MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition,
     MediaTypeWindows, SeekDirection,
 };
 
@@ -23,6 +23,8 @@ struct Handlers {
     button: i64,
     playback_position: i64,
     playback_rate: i64,
+    shuffle: i64,
+    repeat: i64,
 }
 
 /// A handle to Windows' SystemMediaTransportControls
@@ -155,10 +157,32 @@ impl MediaControls for Windows {
         });
 
         let rate_handler = TypedEventHandler::new({
+            let event_handler = event_handler.clone();
             move |_, args: Ref<PlaybackRateChangeRequestedEventArgs>| {
                 let args = (*args).as_ref().unwrap();
                 let rate = args.RequestedPlaybackRate()?;
                 (event_handler.lock().unwrap())(MediaControlEvent::SetRate(rate));
+                Ok(())
+            }
+        });
+
+        let shuffle_handler = TypedEventHandler::new({
+            let event_handler = event_handler.clone();
+            move |_, args: Ref<ShuffleEnabledChangeRequestedEventArgs>| {
+                let args = (*args).as_ref().unwrap();
+                let shuffle = args.RequestedShuffleEnabled()?;
+                (event_handler.lock().unwrap())(MediaControlEvent::SetShuffle(shuffle));
+                Ok(())
+            }
+        });
+
+        let repeat_handler = TypedEventHandler::new({
+            move |_, args: Ref<AutoRepeatModeChangeRequestedEventArgs>| {
+                let args = (*args).as_ref().unwrap();
+                let repeat = args.RequestedAutoRepeatMode()?;
+                if let Some(repeat) = Loop::from_native(repeat) {
+                    (event_handler.lock().unwrap())(MediaControlEvent::SetLoop(repeat));
+                }
                 Ok(())
             }
         });
@@ -169,6 +193,12 @@ impl MediaControls for Windows {
                 .controls
                 .PlaybackPositionChangeRequested(&position_handler)?,
             playback_rate: self.controls.PlaybackRateChangeRequested(&rate_handler)?,
+            shuffle: self
+                .controls
+                .ShuffleEnabledChangeRequested(&shuffle_handler)?,
+            repeat: self
+                .controls
+                .AutoRepeatModeChangeRequested(&repeat_handler)?,
         });
 
         Ok(())
@@ -182,6 +212,10 @@ impl MediaControls for Windows {
                 .RemovePlaybackPositionChangeRequested(handlers.playback_position)?;
             self.controls
                 .RemovePlaybackRateChangeRequested(handlers.playback_rate)?;
+            self.controls
+                .RemoveShuffleEnabledChangeRequested(handlers.shuffle)?;
+            self.controls
+                .RemoveAutoRepeatModeChangeRequested(handlers.repeat)?;
         }
         self.handlers = None;
         Ok(())
@@ -342,6 +376,27 @@ impl MediaTypeWindows {
             MediaTypeWindows::Music => MediaPlaybackType::Music,
             MediaTypeWindows::Video => MediaPlaybackType::Video,
             MediaTypeWindows::Image => MediaPlaybackType::Image,
+        }
+    }
+}
+
+impl Loop {
+    fn from_native(mode: MediaPlaybackAutoRepeatMode) -> Option<Self> {
+        if mode == MediaPlaybackAutoRepeatMode::None {
+            Some(Loop::None)
+        } else if mode == MediaPlaybackAutoRepeatMode::Track {
+            Some(Loop::Track)
+        } else if mode == MediaPlaybackAutoRepeatMode::List {
+            Some(Loop::Playlist)
+        } else {
+            None
+        }
+    }
+    fn into_native(self) -> MediaPlaybackAutoRepeatMode {
+        match self {
+            Loop::None => MediaPlaybackAutoRepeatMode::None,
+            Loop::Track => MediaPlaybackAutoRepeatMode::Track,
+            Loop::Playlist => MediaPlaybackAutoRepeatMode::List,
         }
     }
 }
