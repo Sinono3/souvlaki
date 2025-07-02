@@ -26,5 +26,5 @@ jobs:
     - name: Build
       run: cargo build --release --all-targets --verbose
     - name: Build zbus
-      run: cargo build --release --all-targets --verbose --no-default-features --features=use_zbus
+      run: cargo build --release --all-targets --verbose --no-default-features --features=mpris_zbus
       if: ${{ runner.os == 'Linux' }}
