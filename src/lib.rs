@@ -42,7 +42,7 @@ pub enum MediaControlEvent {
     /// **NOTE**: If the event was received and correctly handled,
     /// [`MediaControls::set_rate`] must be called. Note that
     /// this must be done only with the MPRIS backend.
-    SetPlaybackRate(f64),
+    SetRate(f64),
     /// Set shuffle on or off.
     /// **NOTE**: If the event was received and correctly handled,
     /// [`MediaControls::set_shuffle`] must be called. Note that

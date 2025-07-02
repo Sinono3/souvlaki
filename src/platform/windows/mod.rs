@@ -158,7 +158,7 @@ impl MediaControls for Windows {
             move |_, args: Ref<PlaybackRateChangeRequestedEventArgs>| {
                 let args = (*args).as_ref().unwrap();
                 let rate = args.RequestedPlaybackRate()?;
-                (event_handler.lock().unwrap())(MediaControlEvent::SetPlaybackRate(rate));
+                (event_handler.lock().unwrap())(MediaControlEvent::SetRate(rate));
                 Ok(())
             }
         });

@@ -172,7 +172,7 @@ where
             .set({
                 let event_handler = event_handler.clone();
                 move |_, _, rate: f64| {
-                    (event_handler.lock().unwrap())(MediaControlEvent::SetPlaybackRate(rate));
+                    (event_handler.lock().unwrap())(MediaControlEvent::SetRate(rate));
                     Ok(Some(rate))
                 }
             })

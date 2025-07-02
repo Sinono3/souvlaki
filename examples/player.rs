@@ -236,7 +236,7 @@ fn main() {
                             }
                         },
                         SetVolume(_) => todo!(),
-                        SetPlaybackRate(_) => todo!(),
+                        SetRate(_) => todo!(),
                         SetShuffle(_) => todo!(),
                         SetLoop(_) => todo!(),
                         OpenUri(_) => {

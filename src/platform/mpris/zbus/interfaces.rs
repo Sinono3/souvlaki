@@ -153,7 +153,7 @@ impl PlayerInterface {
 
     #[dbus_interface(property)]
     fn set_rate(&self, rate: f64) {
-        self.send_event(MediaControlEvent::SetPlaybackRate(rate));
+        self.send_event(MediaControlEvent::SetRate(rate));
     }
 
     #[dbus_interface(property)]
