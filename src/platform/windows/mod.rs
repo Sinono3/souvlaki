@@ -13,7 +13,7 @@ use windows::Win32::System::WinRT::ISystemMediaTransportControlsInterop;
 
 use crate::{
     MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition,
-    MediaTypeWindows, Repeat, SeekDirection,
+    MediaTypeWindows, Repeat,
 };
 
 pub use windows::core::Error as WindowsError;
@@ -130,9 +130,13 @@ impl MediaControls for Windows {
                 } else if button == SystemMediaTransportControlsButton::Previous {
                     MediaControlEvent::Previous
                 } else if button == SystemMediaTransportControlsButton::FastForward {
-                    MediaControlEvent::Seek(SeekDirection::Forward)
+                    MediaControlEvent::FastForward
                 } else if button == SystemMediaTransportControlsButton::Rewind {
-                    MediaControlEvent::Seek(SeekDirection::Backward)
+                    MediaControlEvent::Rewind
+                } else if button == SystemMediaTransportControlsButton::ChannelUp {
+                    MediaControlEvent::ChannelUp
+                } else if button == SystemMediaTransportControlsButton::ChannelDown {
+                    MediaControlEvent::ChannelDown
                 } else {
                     // Ignore unknown events
                     return Ok(());
@@ -352,6 +356,28 @@ impl MediaControls for Windows {
         };
         self.display_updater.SetThumbnail(&stream)?;
         self.display_updater.Update()?;
+        Ok(())
+    }
+
+    fn set_repeat(&mut self, repeat: Repeat) -> Result<(), Self::Error> {
+        self.controls.SetAutoRepeatMode(repeat.into_native())
+    }
+
+    fn set_shuffle(&mut self, shuffle: bool) -> Result<(), Self::Error> {
+        self.controls.SetShuffleEnabled(shuffle)
+    }
+
+    fn set_volume(&mut self, _volume: f64) -> Result<(), Self::Error> {
+        // Unsupported by Windows. No-op.
+        Ok(())
+    }
+
+    fn set_rate(&mut self, rate: f64) -> Result<(), Self::Error> {
+        self.controls.SetPlaybackRate(rate)
+    }
+
+    fn set_rate_limits(&mut self, _min: f64, _max: f64) -> Result<(), Self::Error> {
+        // Unsupported by Windows. No-op.
         Ok(())
     }
 }

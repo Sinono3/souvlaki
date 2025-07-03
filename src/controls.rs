@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fmt::Debug;
 
-use crate::{MediaControlEvent, MediaMetadata, MediaPlayback};
+use crate::{MediaControlEvent, MediaMetadata, MediaPlayback, Repeat};
 
 /// Defines fundamental operations needed for media controls.
 pub trait MediaControls: Sized + Debug {
@@ -23,6 +23,19 @@ pub trait MediaControls: Sized + Debug {
     fn set_metadata(&mut self, metadata: MediaMetadata) -> Result<(), Self::Error>;
     /// Set the cover art/artwork/thumbnail of the current media item.
     fn set_cover(&mut self, cover: Option<Self::Cover>) -> Result<(), Self::Error>;
+    /// Set the repeat/loop status (none, track, playlist).
+    fn set_repeat(&mut self, repeat: Repeat) -> Result<(), Self::Error>;
+    /// Set the shuffle status.self.inner.mut()
+    fn set_shuffle(&mut self, shuffle: bool) -> Result<(), Self::Error>;
+    /// Set the volume level (0.0-1.0).
+    fn set_volume(&mut self, volume: f64) -> Result<(), Self::Error>;
+    /// Set the playback rate, e.g. 0.5x, 1.0x, 2.0x.
+    fn set_rate(&mut self, rate: f64) -> Result<(), Self::Error>;
+    /// Set the maximum allowed playback rate.
+    /// - max: should always be 1.0 or more
+    /// - min: should always be 1.0 or less
+    /// Only events received within these limits will be sent to the application handler.
+    fn set_rate_limits(&mut self, min: f64, max: f64) -> Result<(), Self::Error>;
 }
 
 /// Wrapper around a specific OS implementation of media controls.
@@ -61,6 +74,29 @@ impl<T: MediaControls> MediaControlsWrapper<T> {
     /// Set the cover art/artwork/thumbnail of the current media item.
     pub fn set_cover(&mut self, cover: Option<T::Cover>) -> Result<(), T::Error> {
         self.inner.set_cover(cover)
+    }
+    /// Set the repeat/loop status (none, track, playlist).
+    pub fn set_repeat(&mut self, repeat: Repeat) -> Result<(), T::Error> {
+        self.inner.set_repeat(repeat)
+    }
+    /// Set the shuffle status.
+    pub fn set_shuffle(&mut self, shuffle: bool) -> Result<(), T::Error> {
+        self.inner.set_shuffle(shuffle)
+    }
+    /// Set the volume level (0.0-1.0).
+    pub fn set_volume(&mut self, volume: f64) -> Result<(), T::Error> {
+        self.inner.set_volume(volume)
+    }
+    /// Set the playback rate, e.g. 0.5x, 1.0x, 2.0x.
+    pub fn set_rate(&mut self, rate: f64) -> Result<(), T::Error> {
+        self.inner.set_rate(rate)
+    }
+    /// Set the maximum allowed playback rate.
+    /// - max: should always be 1.0 or more
+    /// - min: should always be 1.0 or less
+    /// Only events received within these limits will be sent to the application handler.
+    pub fn set_rate_limits(&mut self, min: f64, max: f64) -> Result<(), T::Error> {
+        self.inner.set_rate_limits(min, max)
     }
 }
 

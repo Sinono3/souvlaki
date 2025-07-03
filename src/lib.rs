@@ -3,9 +3,6 @@
 use std::{fmt::Debug, time::Duration};
 
 mod controls;
-/// Contains traits which extend MediaControls by adding additional methods
-/// available only in specific OSes.
-pub mod extensions;
 mod metadata;
 /// The platform-specific implementations of the media controls.
 pub mod platform;
@@ -13,6 +10,7 @@ pub mod platform;
 pub use controls::{MediaControls, MediaControlsWrapper};
 pub use metadata::*;
 
+/// The current OS's media controls.
 pub type OsMediaControls = controls::MediaControlsWrapper<crate::platform::OsImpl>;
 
 /// Events caused by the user interacting with the OS media controls.
@@ -32,28 +30,35 @@ pub enum MediaControlEvent {
     /// Set the position/progress of the currently playing media item.
     SetPosition(MediaPosition),
     /// Set the volume. The value is intended to be from 0.0 to 1.0.
-    /// But other values are also accepted. **It is up to the user to
-    /// set constraints on this value.**
-    /// **NOTE**: If the event was received and correctly handled,
-    /// [`MediaControls::set_volume`] must be called. Note that
-    /// this must be done only with the MPRIS backend.
+    /// But other values are also accepted. **It is up to the
+    /// application to set constraints on this value.**
+    /// **NOTE**: If the request was handled, and the property
+    /// was changed, [`MediaControls::set_volume`] must be called
+    /// with the new value.
     SetVolume(f64),
     /// Set the playback rate.
-    /// **NOTE**: If the event was received and correctly handled,
-    /// [`MediaControls::set_rate`] must be called. Note that
-    /// this must be done only with the MPRIS backend.
+    /// **NOTE**: If the request was handled, and the property
+    /// was changed, [`MediaControls::set_rate`] must be called
+    /// with the new value.
     SetRate(f64),
     /// Set shuffle on or off.
-    /// **NOTE**: If the event was received and correctly handled,
-    /// [`MediaControls::set_shuffle`] must be called. Note that
-    /// this must be done only with the MPRIS backend.
+    /// **NOTE**: If the request was handled, and the property
+    /// was changed, [`MediaControls::set_shuffle`] must be called
+    /// with the new value.
     SetShuffle(bool),
     /// Set repeat mode of the media item: (none, track, playlist)
-    /// **NOTE**: If the event was received and correctly handled,
-    /// [`MediaControls::set_loop`] must be called. Note that
-    /// this must be done only with the MPRIS backend.
+    /// **NOTE**: If the request was handled, and the property
+    /// was changed, [`MediaControls::set_repeat`] must be called
+    /// with the new value.
     SetRepeat(Repeat),
 
+    /// Windows-specific
+    FastForward,
+    Rewind,
+    ChannelUp,
+    ChannelDown,
+
+    /// MPRIS-specific
     /// Open the URI in the media player.
     OpenUri(String),
     /// Bring the media player's user interface to the front using any appropriate mechanism available.
