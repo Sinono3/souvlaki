@@ -15,9 +15,9 @@ mod dbus;
 /// MPRIS-specific configuration needed to create media controls.
 #[derive(Debug)]
 pub struct MprisConfig {
-    /// The name to be displayed to the user. (*Required on Linux*)
+    /// The name to be displayed to the user.
     pub display_name: String,
-    /// Should follow [the D-Bus spec](https://dbus.freedesktop.org/doc/dbus-specification.html#message-protocol-names-bus). (*Required on Linux*)
+    /// Should follow [the D-Bus spec](https://dbus.freedesktop.org/doc/dbus-specification.html#message-protocol-names-bus).
     pub dbus_name: String,
 }
 
@@ -75,7 +75,7 @@ impl MprisCover {
     }
 }
 
-use crate::{extensions::MprisPropertiesExt, MediaMetadata, MediaPlayback, Repeat};
+use crate::{MediaMetadata, MediaPlayback, Repeat};
 use crate::{MediaControlEvent, MediaControls};
 use std::collections::HashMap;
 use std::{sync::mpsc, thread::JoinHandle};
@@ -230,11 +230,9 @@ impl MediaControls for Mpris {
     fn set_cover(&mut self, cover: Option<Self::Cover>) -> Result<(), Self::Error> {
         self.send_internal_event(InternalEvent::SetCover(cover))
     }
-}
 
-impl MprisPropertiesExt for Mpris {
-    fn set_loop_status(&mut self, loop_status: Repeat) -> Result<(), Self::Error> {
-        self.send_internal_event(InternalEvent::SetLoopStatus(loop_status))
+    fn set_repeat(&mut self, repeat: Repeat) -> Result<(), Self::Error> {
+        self.send_internal_event(InternalEvent::SetLoopStatus(repeat))
     }
 
     fn set_rate(&mut self, rate: f64) -> Result<(), Self::Error> {
@@ -249,12 +247,10 @@ impl MprisPropertiesExt for Mpris {
         self.send_internal_event(InternalEvent::SetVolume(volume))
     }
 
-    fn set_maximum_rate(&mut self, rate: f64) -> Result<(), Self::Error> {
-        self.send_internal_event(InternalEvent::SetMaximumRate(rate))
-    }
-
-    fn set_minimum_rate(&mut self, rate: f64) -> Result<(), Self::Error> {
-        self.send_internal_event(InternalEvent::SetMinimumRate(rate))
+    fn set_rate_limits(&mut self, min: f64, max: f64) -> Result<(), Self::Error> {
+        self.send_internal_event(InternalEvent::SetMinimumRate(min))?;
+        self.send_internal_event(InternalEvent::SetMaximumRate(max))?;
+        Ok(())
     }
 }
 
