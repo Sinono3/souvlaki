@@ -230,3 +230,62 @@ Gets or sets a value representing the start time of the currently playing media 
 - **Low (1):** The sound level is low.
 - **Full (2):** The sound level is at full volume.
 
+## ImageDisplayProperties
+
+### Properties
+
+#### Subtitle
+
+Gets or sets the subtitle of the image.
+
+#### Title	
+
+Gets or sets the title of the image.
+
+## MusicDisplayProperties
+
+### Properties
+
+#### AlbumArtist
+
+Gets or sets the name of the album artist.
+
+#### AlbumTitle
+
+Gets or sets the album title.
+
+#### AlbumTrackCount
+
+Gets or sets the album track count.
+
+#### Artist
+
+Gets or set the name of the song artist.
+
+#### Genres
+
+Gets a modifiable list of strings representing genre names.
+
+#### Title
+
+Gets or set the title of the song.
+
+#### TrackNumber
+
+Gets or sets the track number.
+
+## VideoDisplayProperties
+
+### Properties
+
+#### Genres	
+
+Gets a modifiable list of strings representing genre names.
+
+#### Subtitle
+
+Gets or sets the subtitle of the video.
+
+#### Title
+
+Gets or sets the title of the video.

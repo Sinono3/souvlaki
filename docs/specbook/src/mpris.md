@@ -160,7 +160,7 @@ If CanPlay is false, attempting to call this method should have no effect.
 
 #### Seek(x: Offset) -> nothing 
 
-##### Parameters
+#### Parameters
 
 - **Offset - x (Time_In_Us)**
 	The number of microseconds to seek forward.
@@ -255,32 +255,21 @@ Not all values may be accepted by the media player. It is left to media player i
 
 #### Shuffle b Read/Write
 
+> When this property changes, the org.freedesktop.DBus.Properties.PropertiesChanged signal is emitted with the new value.
 
+A value of false indicates that playback is progressing linearly through a playlist, while true means playback is progressing through a playlist in some other order.
+
+If CanControl is false, attempting to set this property should have no effect and raise an error.
 
 #### Metadata a{sv} (Metadata_Map) Read only
 
-- [x] `mpris:trackid` (D-Bus path): A unique identity for this track within the context of an MPRIS object (eg: tracklist).
-- [x] `mpris:length` (64-bit integer): The duration of the track in microseconds.
-- [x] `mpris:artUrl` (URI): The location of an image representing the track or album. Clients should not assume this will continue to exist when the media player stops giving out the URL.
-- [x] `xesam:album` (String): The album name.
-- [x] `xesam:albumArtist` (List of Strings): The album artist(s).
-- [x] `xesam:artist` (List of Strings): The track artist(s).
-- [x] `xesam:asText` (String): The track lyrics.
-- [x] `xesam:audioBPM` (Integer): The speed of the music, in beats per minute.
-- [x] `xesam:autoRating` (Float): An automatically-generated rating, based on things such as how often it has been played. This should be in the range 0.0 to 1.0.
-- [x] `xesam:comment` (List of Strings): A (list of) freeform comment(s).
-- [x] `xesam:composer` (List of Strings): The composer(s) of the track.
-- [ ] `xesam:contentCreated` (Date/Time): When the track was created. Usually only the year component will be useful.
-- [x] `xesam:discNumber` (Integer): The disc number on the album that this track is from.
-- [ ] `xesam:firstUsed` (Date/Time): When the track was first played.
-- [x] `xesam:genre` (List of Strings): The genre(s) of the track.
-- [ ] `xesam:lastUsed` (Date/Time): When the track was last played.
-- [x] `xesam:lyricist` (List of Strings): The lyricist(s) of the track.
-- [x] `xesam:title` (String): The track title.
-- [x] `xesam:trackNumber` (Integer): The track number on the album disc.
-- [x] `xesam:url` (URI): The location of the media file.
-- [x] `xesam:useCount` (Integer): The number of times the track has been played.
-- [x] `xesam:userRating` (Float): A user-specified rating. This should be in the range 0.0 to 1.0.
+> When this property changes, the org.freedesktop.DBus.Properties.PropertiesChanged signal is emitted with the new value.
+
+The metadata of the current element.
+
+If there is a current track, this must have a "mpris:trackid" entry (of D-Bus type "o") at the very least, which contains a D-Bus path that uniquely identifies this track.
+
+See the type documentation for more details.
 
 #### Volume d (Volume) Read/Write
 
@@ -376,6 +365,131 @@ This property is not expected to change, as it describes an intrinsic capability
 
 If this is false, clients should assume that all properties on this interface are read-only (and will raise errors if writing to them is attempted), no methods are implemented and all other properties starting with "Can" are also false.
 
+## Metadata
+
+### Type/format
+
+A mapping from metadata attribute names to values.
+
+The mpris:trackid attribute must always be present, and must be of D-Bus type "o". This contains a D-Bus path that uniquely identifies the track within the scope of the playlist. There may or may not be an actual D-Bus object at that path; this specification says nothing about what interfaces such an object may implement.
+
+If the length of the track is known, it should be provided in the metadata property with the "mpris:length" key. The length must be given in microseconds, and be represented as a signed 64-bit integer.
+
+If there is an image associated with the track, a URL for it may be provided using the "mpris:artUrl" key. For other metadata, fields defined by the Xesam ontology should be used, prefixed by "xesam:". See the metadata page on the freedesktop.org wiki for a list of common fields.
+
+Lists of strings should be passed using the array-of-string ("as") D-Bus type. Dates should be passed as strings using the ISO 8601 extended format (eg: 2007-04-29T14:35:51). If the timezone is known, RFC 3339's internet profile should be used (eg: 2007-04-29T14:35:51+02:00).
+
+### Types
+
+#### List of Strings
+
+Note that some types that you might expect to be strings are, in fact, "lists of strings". These should be sent using the "as" D-Bus type (array of string).
+
+#### Date/Time
+
+Date/time fields should be sent as strings in ISO 8601 extended format. If the timezone is known (eg: for xesam:lastPlayed), the internet profile format of ISO 8601, as specified in RFC 3339, should be used.
+
+For example: "2007-04-29T13:56+01:00" for 29th April 2007, four minutes to 2pm, in a time zone 1 hour ahead of UTC.
+
+#### URI
+
+URIs should be sent as (UTF-8) strings. Local files should use the "file://" schema.
+
+### Fields (MPRIS-specific)
+
+#### mpris:trackid
+
+D-Bus path: A unique identity for this track within the context of an MPRIS object (eg: tracklist).
+
+#### mpris:length
+
+64-bit integer: The duration of the track in microseconds.
+
+#### mpris:artUrl
+
+URI: The location of an image representing the track or album. Clients should not assume this will continue to exist when the media player stops giving out the URL.
+
+### Common Xesam properties
+
+Common audio properties from the Xesam specification:
+
+#### xesam:album
+
+String: The album name.
+
+#### xesam:albumArtist
+
+List of Strings: The album artist(s).
+
+#### xesam:artist
+
+List of Strings: The track artist(s).
+
+#### xesam:asText
+
+String: The track lyrics.
+
+#### xesam:audioBPM
+
+Integer: The speed of the music, in beats per minute.
+
+#### xesam:autoRating
+
+Float: An automatically-generated rating, based on things such as how often it has been played. This should be in the range 0.0 to 1.0.
+
+#### xesam:comment
+
+List of Strings: A (list of) freeform comment(s).
+
+#### xesam:composer
+
+List of Strings: The composer(s) of the track.
+
+#### xesam:contentCreated
+
+Date/Time: When the track was created. Usually only the year component will be useful.
+
+#### xesam:discNumber
+
+Integer: The disc number on the album that this track is from.
+
+#### xesam:firstUsed
+
+Date/Time: When the track was first played.
+
+#### xesam:genre
+
+List of Strings: The genre(s) of the track.
+
+#### xesam:lastUsed
+
+Date/Time: When the track was last played.
+
+#### xesam:lyricist
+
+List of Strings: The lyricist(s) of the track.
+
+#### xesam:title
+
+String: The track title.
+
+#### xesam:trackNumber
+
+Integer: The track number on the album disc.
+
+#### xesam:url
+
+URI: The location of the media file.
+
+#### xesam:useCount
+
+Integer: The number of times the track has been played.
+
+#### xesam:userRating
+
+Float: A user-specified rating. This should be in the range 0.0 to 1.0.
+
+
 ## org.mpris.MediaPlayer2.TrackList
 
 TODO.
@@ -383,3 +497,4 @@ TODO.
 ## org.mpris.MediaPlayer2.Playlists
 
 TODO.
+
