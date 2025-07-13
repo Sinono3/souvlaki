@@ -70,10 +70,43 @@ impl std::fmt::Debug for AppleCover {
     }
 }
 
+#[derive(Clone, PartialEq, Debug)]
+pub struct ApplePermissions {
+    // Enables/disables togglePlayPauseCommand
+    pub toggle_play_pause: bool,
+    // Enables/disables playCommand
+    pub play: bool,
+    // Enables/disables pauseCommand
+    pub pause: bool,
+    // Enables/disables stopCommand
+    pub stop: bool,
+    // Enables/disables previousTrackCommand
+    pub previous_track: bool,
+    // Enables/disables nextTrackCommand
+    pub next_track: bool,
+    // Enables/disables changeRepeatModeCommand
+    pub change_repeat_mode: bool,
+    // Enables/disables changeShuffleModeCommand
+    pub change_shuffle_mode: bool,
+    // Enables/disables changePlaybackRateCommand
+    pub change_playback_rate: bool,
+    // Enables/disables seekBackwardCommand
+    pub seek_backward: bool,
+    // Enables/disables seekForwardCommand
+    pub seek_forward: bool,
+    // Enables/disables skipBackwardCommand
+    pub skip_backward: bool,
+    // Enables/disables skipForwardCommand
+    pub skip_forward: bool,
+    // Enables/disables changePlaybackPositionCommand
+    pub change_playback_position: bool,
+}
+
 impl MediaControls for Apple {
     type Error = AppleError;
     type PlatformConfig = ();
     type Cover = AppleCover;
+    type Permissions = ApplePermissions;
 
     fn new(_config: Self::PlatformConfig) -> Result<Self, AppleError> {
         Ok(Self)
@@ -89,6 +122,11 @@ impl MediaControls for Apple {
 
     fn detach(&mut self) -> Result<(), AppleError> {
         unsafe { detach_command_handlers() };
+        Ok(())
+    }
+
+    fn set_permissions(&mut self, permissions: Self::Permissions) -> Result<(), AppleError> {
+        unsafe { set_permissions(permissions) };
         Ok(())
     }
 
@@ -431,7 +469,7 @@ unsafe fn attach_command_handlers(handler: Arc<dyn Fn(MediaControlEvent)>) {
         ($id:ident, $handler:expr) => {
             let cb_handler = ConcreteBlock::new($handler).copy();
             let cmd: id = msg_send!(command_center, $id);
-            let _: () = msg_send!(cmd, setEnabled: YES);
+            let _: () = msg_send!(cmd, setEnabled: NO);
             let _: () = msg_send!(cmd, addTargetWithHandler: cb_handler);
         };
     }
@@ -725,4 +763,47 @@ unsafe fn mp_artwork(image: id, bounds: CGSize) -> id {
     let artwork: id = msg_send!(artwork, initWithBoundsSize: bounds
                                          requestHandler: handler);
     artwork
+}
+
+unsafe fn set_permissions(permissions: ApplePermissions) {
+    let command_center: id = msg_send!(class!(MPRemoteCommandCenter), sharedCommandCenter);
+
+    macro_rules! perm {
+        ($value:expr, $id: ident) => {
+            let cmd: id = msg_send!(command_center, $id);
+            let yes_no = if $value { YES } else { NO };
+            let _: () = msg_send!(cmd, setEnabled: yes_no);
+        }
+    }
+
+    let ApplePermissions {
+        toggle_play_pause,
+        play,
+        pause,
+        stop,
+        previous_track,
+        next_track,
+        change_repeat_mode,
+        change_shuffle_mode,
+        change_playback_rate,
+        seek_backward,
+        seek_forward,
+        skip_backward,
+        skip_forward,
+        change_playback_position,
+    } = permissions;
+    perm!(toggle_play_pause, togglePlayPauseCommand);
+    perm!(play, playCommand);
+    perm!(pause, pauseCommand);
+    perm!(stop, stopCommand);
+    perm!(previous_track, previousTrackCommand);
+    perm!(next_track, nextTrackCommand);
+    perm!(change_repeat_mode, changeRepeatModeCommand);
+    perm!(change_shuffle_mode, changeShuffleModeCommand);
+    perm!(change_playback_rate, changePlaybackRateCommand);
+    perm!(seek_backward, seekBackwardCommand);
+    perm!(seek_forward, seekForwardCommand);
+    perm!(skip_backward, skipBackwardCommand);
+    perm!(skip_forward, skipForwardCommand);
+    perm!(change_playback_position, changePlaybackPositionCommand);
 }
