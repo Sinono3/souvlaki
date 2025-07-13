@@ -38,6 +38,7 @@ pub trait MediaControls: Sized + Debug {
     fn set_rate_limits(&mut self, min: f64, max: f64) -> Result<(), Self::Error>;
 }
 
+/// NOTE: Use this wrapper instead of the platform-specific control structs.
 /// Wrapper around a specific OS implementation of media controls.
 /// Needed due to how Rust traits work.
 /// Automatically detaches on Drop.
@@ -45,57 +46,47 @@ pub struct MediaControlsWrapper<OsImpl: MediaControls> {
     inner: OsImpl,
 }
 
-impl<T: MediaControls> MediaControlsWrapper<T> {
-    /// Create media controls with the specified config.
-    pub fn new(config: T::PlatformConfig) -> Result<Self, T::Error> {
+impl<T: MediaControls> MediaControls for MediaControlsWrapper<T> {
+    type Error = T::Error;
+    type PlatformConfig = T::PlatformConfig;
+    type Cover = T::Cover;
+
+    fn new(config: T::PlatformConfig) -> Result<Self, T::Error> {
         Ok(Self {
             inner: T::new(config)?,
         })
     }
-    /// Attach the media control events to a handler.
-    pub fn attach<F>(&mut self, event_handler: F) -> Result<(), T::Error>
+    fn attach<F>(&mut self, event_handler: F) -> Result<(), T::Error>
     where
         F: Fn(MediaControlEvent) + Send + 'static,
     {
         self.inner.attach(event_handler)
     }
-    /// Detach the event handler.
-    pub fn detach(&mut self) -> Result<(), T::Error> {
+    fn detach(&mut self) -> Result<(), T::Error> {
         self.inner.detach()
     }
-    /// Set the current playback status.
-    pub fn set_playback(&mut self, playback: MediaPlayback) -> Result<(), T::Error> {
+    fn set_playback(&mut self, playback: MediaPlayback) -> Result<(), T::Error> {
         self.inner.set_playback(playback)
     }
-    /// Set the metadata of the currently playing media item.
-    pub fn set_metadata(&mut self, metadata: MediaMetadata) -> Result<(), T::Error> {
+    fn set_metadata(&mut self, metadata: MediaMetadata) -> Result<(), T::Error> {
         self.inner.set_metadata(metadata)
     }
-    /// Set the cover art/artwork/thumbnail of the current media item.
-    pub fn set_cover(&mut self, cover: Option<T::Cover>) -> Result<(), T::Error> {
+    fn set_cover(&mut self, cover: Option<T::Cover>) -> Result<(), T::Error> {
         self.inner.set_cover(cover)
     }
-    /// Set the repeat/loop status (none, track, playlist).
-    pub fn set_repeat(&mut self, repeat: Repeat) -> Result<(), T::Error> {
+    fn set_repeat(&mut self, repeat: Repeat) -> Result<(), T::Error> {
         self.inner.set_repeat(repeat)
     }
-    /// Set the shuffle status.
-    pub fn set_shuffle(&mut self, shuffle: bool) -> Result<(), T::Error> {
+    fn set_shuffle(&mut self, shuffle: bool) -> Result<(), T::Error> {
         self.inner.set_shuffle(shuffle)
     }
-    /// Set the volume level (0.0-1.0).
-    pub fn set_volume(&mut self, volume: f64) -> Result<(), T::Error> {
+    fn set_volume(&mut self, volume: f64) -> Result<(), T::Error> {
         self.inner.set_volume(volume)
     }
-    /// Set the playback rate, e.g. 0.5x, 1.0x, 2.0x.
-    pub fn set_rate(&mut self, rate: f64) -> Result<(), T::Error> {
+    fn set_rate(&mut self, rate: f64) -> Result<(), T::Error> {
         self.inner.set_rate(rate)
     }
-    /// Set the maximum allowed playback rate.
-    /// - max: should always be 1.0 or more
-    /// - min: should always be 1.0 or less
-    /// Only events received within these limits will be sent to the application handler.
-    pub fn set_rate_limits(&mut self, min: f64, max: f64) -> Result<(), T::Error> {
+    fn set_rate_limits(&mut self, min: f64, max: f64) -> Result<(), T::Error> {
         self.inner.set_rate_limits(min, max)
     }
 }
