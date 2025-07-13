@@ -284,7 +284,7 @@ impl MediaControls for Windows {
         let music = display.MusicProperties()?;
         let image = display.ImageProperties()?;
         let video = display.VideoProperties()?;
-        let h = |x| HSTRING::from(x);
+        let h = HSTRING::from;
         let to_u32 = |x| (x as u32);
 
         display.SetType(
@@ -306,7 +306,7 @@ impl MediaControls for Windows {
 
         // TODO: We should allow setting shared Image and Video genres separately.
         if let Some(genres) = genres {
-            let genres = genres.into_iter().map(|x| HSTRING::from(x));
+            let genres = genres.into_iter().map(HSTRING::from);
             let genres_windows_music = music.Genres()?;
             let genres_windows_video = video.Genres()?;
 
@@ -392,7 +392,7 @@ fn create_stream_from_bytes(data: Vec<u8>) -> Result<IRandomAccessStream, Window
     writer.Close()?;
     output_stream.Close()?;
 
-    Ok(stream.cast::<IRandomAccessStream>()?)
+    stream.cast::<IRandomAccessStream>()
 }
 
 impl MediaTypeWindows {

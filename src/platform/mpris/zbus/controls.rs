@@ -3,8 +3,8 @@ use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use zbus::zvariant::ObjectPath;
 use zbus::connection;
+use zbus::zvariant::ObjectPath;
 
 use super::super::{
     create_metadata_dict, InternalEvent, MprisCover, MprisError, ServiceState, ServiceThreadHandle,
@@ -26,7 +26,6 @@ where
         event_channel,
         thread: thread::spawn(move || {
             pollster::block_on(run_service(dbus_name, friendly_name, event_handler, rx))
-                .map_err(|e| e.into())
         }),
     })
 }
@@ -74,42 +73,42 @@ where
                     interface.state.metadata_dict =
                         create_metadata_dict(&metadata, &interface.state.cover_url);
                     interface.state.metadata = metadata;
-                    interface.metadata_changed(&emitter).await?;
+                    interface.metadata_changed(emitter).await?;
                 }
                 InternalEvent::SetCover(cover) => {
                     let cover_url = MprisCover::to_url(cover);
                     interface.state.metadata_dict =
                         create_metadata_dict(&interface.state.metadata, &cover_url);
                     interface.state.cover_url = cover_url;
-                    interface.metadata_changed(&emitter).await?;
+                    interface.metadata_changed(emitter).await?;
                 }
                 InternalEvent::SetPlayback(playback) => {
                     interface.state.playback_status = playback;
-                    interface.playback_status_changed(&emitter).await?;
+                    interface.playback_status_changed(emitter).await?;
                 }
                 InternalEvent::SetLoopStatus(loop_status) => {
                     interface.state.loop_status = loop_status;
-                    interface.loop_status_changed(&emitter).await?;
+                    interface.loop_status_changed(emitter).await?;
                 }
                 InternalEvent::SetRate(rate) => {
                     interface.state.rate = rate;
-                    interface.rate_changed(&emitter).await?;
+                    interface.rate_changed(emitter).await?;
                 }
                 InternalEvent::SetShuffle(shuffle) => {
                     interface.state.shuffle = shuffle;
-                    interface.shuffle_changed(&emitter).await?;
+                    interface.shuffle_changed(emitter).await?;
                 }
                 InternalEvent::SetVolume(volume) => {
                     interface.state.volume = volume;
-                    interface.volume_changed(&emitter).await?;
+                    interface.volume_changed(emitter).await?;
                 }
                 InternalEvent::SetMaximumRate(rate) => {
                     interface.state.maximum_rate = rate;
-                    interface.maximum_rate_changed(&emitter).await?;
+                    interface.maximum_rate_changed(emitter).await?;
                 }
                 InternalEvent::SetMinimumRate(rate) => {
                     interface.state.minimum_rate = rate;
-                    interface.minimum_rate_changed(&emitter).await?;
+                    interface.minimum_rate_changed(emitter).await?;
                 }
                 InternalEvent::Kill => return Ok(()),
             }

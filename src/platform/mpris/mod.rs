@@ -54,6 +54,7 @@ pub enum MprisCover {
 
 impl MprisCover {
     fn to_url(cover: Option<Self>) -> Option<String> {
+        #[allow(clippy::manual_map)]
         match cover {
             Some(MprisCover::Url(cover_url)) => Some(cover_url),
             None => None,
@@ -75,8 +76,8 @@ impl MprisCover {
     }
 }
 
-use crate::{MediaMetadata, MediaPlayback, Repeat};
 use crate::{MediaControlEvent, MediaControls};
+use crate::{MediaMetadata, MediaPlayback, Repeat};
 use std::collections::HashMap;
 use std::{sync::mpsc, thread::JoinHandle};
 
@@ -224,7 +225,7 @@ impl MediaControls for Mpris {
     }
 
     fn set_metadata(&mut self, metadata: MediaMetadata) -> Result<(), Self::Error> {
-        self.send_internal_event(InternalEvent::SetMetadata(metadata.into()))
+        self.send_internal_event(InternalEvent::SetMetadata(metadata))
     }
 
     fn set_cover(&mut self, cover: Option<Self::Cover>) -> Result<(), Self::Error> {

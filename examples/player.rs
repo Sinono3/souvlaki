@@ -112,10 +112,10 @@ fn main() {
     // Windows platform
     #[cfg(target_os = "windows")]
     let config = {
-        use raw_window_handle::{HasRawWindowHandle, Win32WindowHandle};
-
-        let handle: Win32WindowHandle = window.raw_window_handle();
-        souvlaki::platform::windows::WindowsConfig { hwnd: handle.hwnd }
+        use winit::platform::windows::WindowExtWindows;
+        souvlaki::platform::windows::WindowsConfig {
+            hwnd: window.hwnd() as *mut std::ffi::c_void,
+        }
     };
 
     // Dummy platform (for unsupported OSes)
@@ -265,32 +265,29 @@ fn main() {
                 // Advance
                 // (Not how one should actually do it in a music player. This *will* cause desyncs.)
                 sleep(Duration::from_millis(1));
-                match app.status {
-                    TestAppStatus::Playing { position } => {
-                        app.status = TestAppStatus::Playing {
-                            position: (position + 1),
-                        };
+                if let TestAppStatus::Playing { position } = app.status {
+                    app.status = TestAppStatus::Playing {
+                        position: (position + 1),
+                    };
 
-                        // Go to next song if it has finished
-                        if position >= duration.as_millis() as u64 {
-                            app.song_index = app.song_index.saturating_add(1);
-                            if app.song_index == app.songs.len() {
-                                // The album has ended, restart it.
-                                app.song_index = 0;
-                                app.status = TestAppStatus::Stopped;
-                            } else {
-                                // The album has not ended yet
-                                app.status.go_to(0);
-                            }
-
-                            controls
-                                .set_metadata(app.songs[app.song_index].clone())
-                                .unwrap();
-                            controls.set_cover(cover.clone()).unwrap();
-                            controls.set_playback(app.status.to_souvlaki()).unwrap();
+                    // Go to next song if it has finished
+                    if position >= duration.as_millis() as u64 {
+                        app.song_index = app.song_index.saturating_add(1);
+                        if app.song_index == app.songs.len() {
+                            // The album has ended, restart it.
+                            app.song_index = 0;
+                            app.status = TestAppStatus::Stopped;
+                        } else {
+                            // The album has not ended yet
+                            app.status.go_to(0);
                         }
+
+                        controls
+                            .set_metadata(app.songs[app.song_index].clone())
+                            .unwrap();
+                        controls.set_cover(cover.clone()).unwrap();
+                        controls.set_playback(app.status.to_souvlaki()).unwrap();
                     }
-                    _ => (),
                 }
 
                 // Print every second

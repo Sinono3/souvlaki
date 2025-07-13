@@ -383,7 +383,7 @@ impl Repeat {
             _ => None,
         }
     }
-    fn to_apple(&self) -> NSInteger {
+    fn to_apple(self) -> NSInteger {
         match self {
             Repeat::None => MPRepeatTypeOff,
             Repeat::Track => MPRepeatTypeOne,
@@ -405,7 +405,7 @@ fn shuffle_from_apple(x: NSInteger) -> Option<bool> {
         MPShuffleTypeItems => Some(true),
         // Unsupported
         MPShuffleTypeCollections => None,
-        _ => return None,
+        _ => None,
     }
 }
 fn shuffle_to_apple(x: bool) -> NSInteger {

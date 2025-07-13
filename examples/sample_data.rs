@@ -58,7 +58,7 @@ type Cover = <souvlaki::platform::OsImpl as souvlaki::MediaControls>::Cover;
 #[allow(dead_code)]
 pub fn cover() -> Option<Cover> {
     #[allow(dead_code)]
-    const SOUVLAKI_COVER_URL: &'static str = "https://i.discogs.com/i7xH4rv3WwaRaG_ky3mlJCkCQZ18YnczTcNQs9aYpQ0/rs:fit/g:sm/q:90/h:600/w:589/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTgyOTIw/MC0xNTk1MzY1NzA2/LTUwNzUuanBlZw.jpeg";
+    const SOUVLAKI_COVER_URL: &str = "https://i.discogs.com/i7xH4rv3WwaRaG_ky3mlJCkCQZ18YnczTcNQs9aYpQ0/rs:fit/g:sm/q:90/h:600/w:589/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTgyOTIw/MC0xNTk1MzY1NzA2/LTUwNzUuanBlZw.jpeg";
 
     // MPRIS platform
     #[cfg(all(
@@ -88,10 +88,10 @@ pub fn cover() -> Option<Cover> {
     // Windows platform
     #[cfg(target_os = "windows")]
     {
-        Some(souvlaki::platform::apple::AppleCover::Url(
+        Some(souvlaki::platform::windows::WindowsCover::Uri(
             SOUVLAKI_COVER_URL.to_owned(),
         ))
-    };
+    }
 
     // Dummy platform (for unsupported OSes)
     #[cfg(any(
@@ -105,7 +105,7 @@ pub fn cover() -> Option<Cover> {
 
 #[allow(dead_code)]
 pub fn cover_bytes() -> Option<Cover> {
-    const COVER_BYTES: &'static [u8] = include_bytes!("./cover.png");
+    const COVER_BYTES: &[u8] = include_bytes!("./cover.png");
 
     // MPRIS platform
     #[cfg(all(
@@ -127,10 +127,10 @@ pub fn cover_bytes() -> Option<Cover> {
     // Windows platform
     #[cfg(target_os = "windows")]
     {
-        Some(souvlaki::platform::apple::WindowsCover::Bytes(
+        Some(souvlaki::platform::windows::WindowsCover::Bytes(
             COVER_BYTES.to_vec(),
         ))
-    };
+    }
 
     // Dummy platform (for unsupported OSes)
     #[cfg(any(

@@ -19,11 +19,11 @@ fn main() {
 
     // Windows platform
     #[cfg(target_os = "windows")]
-    let (config, hwnd, _dummy_window) = {
+    let (config, _dummy_window) = {
         let dummy_window = windows::DummyWindow::new().unwrap();
-        let handle = Some(dummy_window.handle.0 as _);
-        let config = souvlaki::platform::windows::WindowsConfig { hwnd: handle.hwnd };
-        (config, handle, dummy_window)
+        let handle = dummy_window.handle.0 as _;
+        let config = souvlaki::platform::windows::WindowsConfig { hwnd: handle };
+        (config, dummy_window)
     };
 
     // Dummy platform (for unsupported OSes)
@@ -67,8 +67,7 @@ mod windows {
     use std::io::Error;
     use std::mem;
 
-    use windows::core::PCWSTR;
-    use windows::w;
+    use windows::core::w;
     use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
     use windows::Win32::System::LibraryLoader::GetModuleHandleW;
     use windows::Win32::UI::WindowsAndMessaging::{
@@ -91,8 +90,8 @@ mod windows {
 
                 let wnd_class = WNDCLASSEXW {
                     cbSize: mem::size_of::<WNDCLASSEXW>() as u32,
-                    hInstance: instance,
-                    lpszClassName: PCWSTR::from(class_name),
+                    hInstance: instance.into(),
+                    lpszClassName: class_name,
                     lpfnWndProc: Some(Self::wnd_proc),
                     ..Default::default()
                 };
@@ -104,7 +103,7 @@ mod windows {
                     ));
                 }
 
-                let handle = CreateWindowExW(
+                CreateWindowExW(
                     WINDOW_EX_STYLE::default(),
                     class_name,
                     w!(""),
@@ -115,21 +114,14 @@ mod windows {
                     0,
                     None,
                     None,
-                    instance,
+                    Some(instance.into()),
                     None,
-                );
-
-                if handle.0 == 0 {
-                    Err(format!(
-                        "Message only window creation failed: {}",
-                        Error::last_os_error()
-                    ))
-                } else {
-                    Ok(handle)
-                }
+                )
             };
 
-            handle_result.map(|handle| DummyWindow { handle })
+            handle_result
+                .map_err(|e| format!("{e}"))
+                .map(|handle| DummyWindow { handle })
         }
         extern "system" fn wnd_proc(
             hwnd: HWND,
@@ -144,7 +136,7 @@ mod windows {
     impl Drop for DummyWindow {
         fn drop(&mut self) {
             unsafe {
-                DestroyWindow(self.handle);
+                let _ = DestroyWindow(self.handle);
             }
         }
     }
@@ -155,7 +147,7 @@ mod windows {
             let mut has_message = PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE).as_bool();
             while msg.message != WM_QUIT && has_message {
                 if !IsDialogMessageW(GetAncestor(msg.hwnd, GA_ROOT), &msg).as_bool() {
-                    TranslateMessage(&msg);
+                    let _ = TranslateMessage(&msg);
                     DispatchMessageW(&msg);
                 }
 
