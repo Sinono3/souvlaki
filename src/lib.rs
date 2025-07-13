@@ -52,12 +52,6 @@ pub enum MediaControlEvent {
     /// with the new value.
     SetRepeat(Repeat),
 
-    /// Windows-specific
-    FastForward,
-    Rewind,
-    ChannelUp,
-    ChannelDown,
-
     /// MPRIS-specific
     /// Open the URI in the media player.
     OpenUri(String),
@@ -65,6 +59,12 @@ pub enum MediaControlEvent {
     Raise,
     /// Shut down the media player.
     Quit,
+
+    /// Windows-specific
+    FastForward,
+    Rewind,
+    ChannelUp,
+    ChannelDown,
 }
 /// An instant in a media item.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

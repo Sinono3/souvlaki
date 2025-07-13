@@ -22,6 +22,7 @@ use objc::{class, msg_send, sel, sel_impl};
 
 use crate::{
     controls::MediaControls, MediaControlEvent, MediaMetadata, MediaPlayback, MediaPosition,
+    Repeat, SeekDirection,
 };
 
 /// A platform-specific error.
@@ -140,6 +141,31 @@ impl MediaControls for Apple {
 
         Ok(())
     }
+
+    fn set_repeat(&mut self, repeat: crate::Repeat) -> Result<(), Self::Error> {
+        unsafe { set_playback_repeat(repeat) };
+        Ok(())
+    }
+
+    fn set_shuffle(&mut self, shuffle: bool) -> Result<(), Self::Error> {
+        unsafe { set_playback_shuffle(shuffle) };
+        Ok(())
+    }
+
+    fn set_volume(&mut self, _volume: f64) -> Result<(), Self::Error> {
+        // unsupported, ignoring.
+        Ok(())
+    }
+
+    fn set_rate(&mut self, _rate: f64) -> Result<(), Self::Error> {
+        // unsupported, ignoring.
+        Ok(())
+    }
+
+    fn set_rate_limits(&mut self, _min: f64, _max: f64) -> Result<(), Self::Error> {
+        // unsupported, ignoring.
+        Ok(())
+    }
 }
 
 // MPNowPlayingPlaybackState
@@ -149,11 +175,29 @@ const MPNowPlayingPlaybackStateStopped: NSUInteger = 3;
 
 // MPRemoteCommandHandlerStatus
 const MPRemoteCommandHandlerStatusSuccess: NSInteger = 0;
+const MPRemoteCommandHandlerStatusCommandFailed: NSInteger = 1;
+
+// MPShuffleType
+/// Nothing is shuffled during playback.
+const MPShuffleTypeOff: NSInteger = 0;
+/// Individual items are shuffled during playback.
+const MPShuffleTypeItems: NSInteger = 1;
+/// Collections of items are shuffled during playback.
+const MPShuffleTypeCollections: NSInteger = 2;
+
+// MPRepeatType
+/// Nothing is repeated during playback.
+const MPRepeatTypeOff: NSInteger = 0;
+/// A single item is repeated indefinitely.
+const MPRepeatTypeOne: NSInteger = 1;
+/// The current container or playlist is repeated indefinitely.
+const MPRepeatTypeAll: NSInteger = 2;
 
 #[allow(dead_code)]
 extern "C" {
-    /// [NSString] The playback duration of the media item.
-    static MPMediaItemPropertyPlaybackDuration: id;
+    /// Supported MPMediaItem properties
+    /// [NSString] The title of an album.
+    static MPMediaItemPropertyAlbumTitle: id;
     /// [NSString] The track number of the media item, for a media item that is part of an album.
     static MPMediaItemPropertyAlbumTrackNumber: id;
     /// [NSString] The number of tracks for the album that contains the media item.
@@ -164,72 +208,22 @@ extern "C" {
     static MPMediaItemPropertyDiscCount: id;
     /// [NSString] The artwork image for the media item.
     static MPMediaItemPropertyArtwork: id;
-    /// [NSString] The lyrics for the media item.
-    static MPMediaItemPropertyLyrics: id;
-    /// [NSString] The date of the media item’s first public release.
-    static MPMediaItemPropertyReleaseDate: id;
-    /// [NSString] The number of musical beats per minute for the media item.
-    static MPMediaItemPropertyBeatsPerMinute: id;
-    /// [NSString] Textual information about the media item.
-    static MPMediaItemPropertyComments: id;
-    /// [NSString] A URL that points to the media item.
-    static MPMediaItemPropertyAssetURL: id;
-    /// [NSString] A Boolean value that indicates whether the media item contains explicit (adult) lyrics or language.
-    static MPMediaItemPropertyIsExplicit: id;
-    /// [NSString] A Boolean value that indicates whether the media item is a preorder.
-    static MPMediaItemPropertyIsPreorder: id;
-    /// [NSString] The identifier for enqueueing store tracks.
-    static MPMediaItemPropertyPlaybackStoreID: id;
     /// [NSString] The primary performing artist for an album.
     static MPMediaItemPropertyAlbumArtist: id;
-    /// [NSString] The persistent identifier for an album artist.
-    static MPMediaItemPropertyAlbumArtistPersistentID: id;
-    /// [NSString] The key for the persistent identifier for an album.
-    static MPMediaItemPropertyAlbumPersistentID: id;
-    /// [NSString] The title of an album.
-    static MPMediaItemPropertyAlbumTitle: id;
-    /// [NSString] The performing artists for a media item — which may vary from the primary artist for the album that a media item belongs to.
+    /// [NSString] The performing artists for a media item — which may vary from the primary artist for the album that a media tem belongs to.
     static MPMediaItemPropertyArtist: id;
-    /// [NSString] The key for the persistent identifier for an artist.
-    static MPMediaItemPropertyArtistPersistentID: id;
-    /// [NSString] The musical composer for the media item.
-    static MPMediaItemPropertyComposer: id;
-    /// [NSString] The persistent identifier for a composer.
-    static MPMediaItemPropertyComposerPersistentID: id;
     /// [NSString] The music or film genre of the media item.
     static MPMediaItemPropertyGenre: id;
-    /// [NSString] The persistent identifier for a genre.
-    static MPMediaItemPropertyGenrePersistentID: id;
-    /// [NSString] A Boolean value that indicates the media item has DRM protection so it can’t play through a standard playback API.
-    static MPMediaItemPropertyHasProtectedAsset: id;
-    /// [NSString] A Boolean value that indicates whether the media item is part of a compilation.
-    static MPMediaItemPropertyIsCompilation: id;
-    /// [NSString] A Boolean value that indicates whether the media item is an iCloud item.
-    static MPMediaItemPropertyIsCloudItem: id;
     /// [NSString] The media type of the media item.
     static MPMediaItemPropertyMediaType: id;
     /// [NSString] The key for the persistent identifier for the media item.
     static MPMediaItemPropertyPersistentID: id;
-    /// [NSString] The number of times the user plays the media item.
-    static MPMediaItemPropertyPlayCount: id;
-    /// [NSString] The persistent identifier for an audio podcast.
-    static MPMediaItemPropertyPodcastPersistentID: id;
-    /// [NSString] The title of a podcast.
-    static MPMediaItemPropertyPodcastTitle: id;
+    /// [NSString] The playback duration of the media item.
+    static MPMediaItemPropertyPlaybackDuration: id;
     /// [NSString] The title or name of the media item.
     static MPMediaItemPropertyTitle: id;
-    /// [NSString] The number of times the user has skipped playing the item.
-    static MPMediaItemPropertySkipCount: id;
-    /// [NSString] The user-specified rating of the object in the range [0...5], where a value of 5 indicates the most favorable rating.
-    static MPMediaItemPropertyRating: id;
-    /// [NSString] The most recent calendar date on which the user played the media item.
-    static MPMediaItemPropertyLastPlayedDate: id;
-    /// [NSString] Corresponds to the “Grouping” field in the Info tab in the Get Info dialog in iTunes.
-    static MPMediaItemPropertyUserGrouping: id;
-    /// [NSString] The user’s place in the media item the most recent time it was played.
-    static MPMediaItemPropertyBookmarkTime: id;
-    /// [NSString] The date the media item was added to the user’s Media library.
-    static MPMediaItemPropertyDateAdded: id;
+
+    /// NowPlayingInfo properties (all supported)
     /// [NSString] The identifier of the collection the Now Playing item belongs to.
     static MPNowPlayingInfoCollectionIdentifier: id;
     /// [NSString] A list of ad breaks in the Now Playing item.
@@ -319,35 +313,10 @@ unsafe fn set_playback_metadata(metadata: MediaMetadata) {
         disc_number,
         disc_count,
         duration,
-        ref composer,
-        ref lyrics,
-        ref comment,
-        beats_per_minute,
-        user_rating_05,
-        play_count,
-        skip_count,
-        ref media_url,
         media_persistent_id,
-        artist_persistent_id,
-        album_persistent_id,
-        album_artist_persistent_id,
-        composer_persistent_id,
-        genre_persistent_id,
-        podcast_persistent_id,
-        // TODO: media_type_macos,
-        bookmark_time,
-        is_cloud_item,
-        is_compilation,
-        is_preorder,
-        is_explicit,
-        has_protected_asset,
-        ref playback_store_id,
-        ref podcast_title,
-        ref user_grouping,
         ..
     } = metadata;
     let duration = duration.map(|x| x.as_secs_f64());
-    let bookmark_time = bookmark_time.map(|x| x.as_secs_f64());
 
     set_metadata!(ns_string, title, MPMediaItemPropertyTitle);
     set_metadata!(ns_string, artist, MPMediaItemPropertyArtist);
@@ -367,80 +336,11 @@ unsafe fn set_playback_metadata(metadata: MediaMetadata) {
     set_metadata!(ns_number_int, disc_number, MPMediaItemPropertyDiscNumber);
     set_metadata!(ns_number_int, disc_count, MPMediaItemPropertyDiscCount);
     set_metadata!(ns_number_f64, duration, MPMediaItemPropertyPlaybackDuration);
-    set_metadata!(ns_string, composer, MPMediaItemPropertyComposer);
-    set_metadata!(ns_string, lyrics, MPMediaItemPropertyLyrics);
-    set_metadata!(ns_string, comment, MPMediaItemPropertyComments);
-    set_metadata!(
-        ns_number_int,
-        beats_per_minute,
-        MPMediaItemPropertyBeatsPerMinute
-    );
-    set_metadata!(ns_number_int, user_rating_05, MPMediaItemPropertyRating);
-    set_metadata!(ns_number_int, play_count, MPMediaItemPropertyPlayCount);
-    set_metadata!(ns_number_int, skip_count, MPMediaItemPropertySkipCount);
-    set_metadata!(ns_url, media_url, MPMediaItemPropertyAssetURL);
     set_metadata!(
         ns_number_u64,
         media_persistent_id,
         MPMediaItemPropertyPersistentID
     );
-    set_metadata!(
-        ns_number_u64,
-        artist_persistent_id,
-        MPMediaItemPropertyArtistPersistentID
-    );
-    set_metadata!(
-        ns_number_u64,
-        album_persistent_id,
-        MPMediaItemPropertyAlbumPersistentID
-    );
-    set_metadata!(
-        ns_number_u64,
-        album_artist_persistent_id,
-        MPMediaItemPropertyAlbumArtistPersistentID
-    );
-    set_metadata!(
-        ns_number_u64,
-        composer_persistent_id,
-        MPMediaItemPropertyComposerPersistentID
-    );
-    set_metadata!(
-        ns_number_u64,
-        genre_persistent_id,
-        MPMediaItemPropertyGenrePersistentID
-    );
-    set_metadata!(
-        ns_number_u64,
-        podcast_persistent_id,
-        MPMediaItemPropertyPodcastPersistentID
-    );
-    // TODO:
-    // set_metadata!(
-    //     ns_u64,
-    //     media_type_macos,
-    //     MPMediaItemPropertyMediaTypeMacos
-    // );
-    set_metadata!(
-        ns_number_f64,
-        bookmark_time,
-        MPMediaItemPropertyBookmarkTime
-    );
-    set_metadata!(ns_bool, is_cloud_item, MPMediaItemPropertyIsCloudItem);
-    set_metadata!(ns_bool, is_compilation, MPMediaItemPropertyIsCompilation);
-    set_metadata!(ns_bool, is_preorder, MPMediaItemPropertyIsPreorder);
-    set_metadata!(ns_bool, is_explicit, MPMediaItemPropertyIsExplicit);
-    set_metadata!(
-        ns_bool,
-        has_protected_asset,
-        MPMediaItemPropertyHasProtectedAsset
-    );
-    set_metadata!(
-        ns_string,
-        playback_store_id,
-        MPMediaItemPropertyPlaybackStoreID
-    );
-    set_metadata!(ns_string, podcast_title, MPMediaItemPropertyPodcastTitle);
-    set_metadata!(ns_string, user_grouping, MPMediaItemPropertyUserGrouping);
 
     // TODO: date support
     // let MediaMetadata {
@@ -474,6 +374,56 @@ unsafe fn set_playback_progress(progress: Duration) {
     let _: () = msg_send!(media_center, setNowPlayingInfo: now_playing);
 }
 
+impl Repeat {
+    fn from_apple(x: NSInteger) -> Option<Self> {
+        match x {
+            MPRepeatTypeOff => Some(Repeat::None),
+            MPRepeatTypeOne => Some(Repeat::Track),
+            MPRepeatTypeAll => Some(Repeat::Playlist),
+            _ => None,
+        }
+    }
+    fn to_apple(&self) -> NSInteger {
+        match self {
+            Repeat::None => MPRepeatTypeOff,
+            Repeat::Track => MPRepeatTypeOne,
+            Repeat::Playlist => MPRepeatTypeAll,
+        }
+    }
+}
+
+unsafe fn set_playback_repeat(repeat: Repeat) {
+    let repeat = repeat.to_apple();
+    let command_center: id = msg_send!(class!(MPRemoteCommandCenter), sharedCommandCenter);
+    let cmd: id = msg_send!(command_center, changeRepeatModeCommand);
+    let _: () = msg_send!(cmd, setCurrentRepeatType: repeat);
+}
+
+fn shuffle_from_apple(x: NSInteger) -> Option<bool> {
+    match x {
+        MPShuffleTypeOff => Some(false),
+        MPShuffleTypeItems => Some(true),
+        // Unsupported
+        MPShuffleTypeCollections => None,
+        _ => return None,
+    }
+}
+fn shuffle_to_apple(x: bool) -> NSInteger {
+    match x {
+        false => MPShuffleTypeOff,
+        true => MPShuffleTypeItems,
+        // Unsupported
+        // ? => MPShuffleTypeCollections,
+    }
+}
+
+unsafe fn set_playback_shuffle(shuffle: bool) {
+    let shuffle = shuffle_to_apple(shuffle);
+    let command_center: id = msg_send!(class!(MPRemoteCommandCenter), sharedCommandCenter);
+    let cmd: id = msg_send!(command_center, changeShuffleModeCommand);
+    let _: () = msg_send!(cmd, setCurrentShuffleType: shuffle);
+}
+
 unsafe fn attach_command_handlers(handler: Arc<dyn Fn(MediaControlEvent)>) {
     let command_center: id = msg_send!(class!(MPRemoteCommandCenter), sharedCommandCenter);
 
@@ -503,6 +453,74 @@ unsafe fn attach_command_handlers(handler: Arc<dyn Fn(MediaControlEvent)>) {
     attach_simple!(stopCommand, MediaControlEvent::Stop);
     attach_simple!(previousTrackCommand, MediaControlEvent::Previous);
     attach_simple!(nextTrackCommand, MediaControlEvent::Next);
+    attach!(changeRepeatModeCommand, {
+        let handler = handler.clone();
+        // event of type MPChangeRepeatModeCommand
+        move |event: id| -> NSInteger {
+            let repeat = *event.as_ref().unwrap().get_ivar::<NSInteger>("_repeatType");
+            let Some(repeat) = Repeat::from_apple(repeat) else {
+                return MPRemoteCommandHandlerStatusCommandFailed;
+            };
+            (handler)(MediaControlEvent::SetRepeat(repeat));
+            MPRemoteCommandHandlerStatusSuccess
+        }
+    });
+    attach!(changeShuffleModeCommand, {
+        let handler = handler.clone();
+        // event of type MPChangeShuffleModeCommand
+        move |event: id| -> NSInteger {
+            let shuffle = *event
+                .as_ref()
+                .unwrap()
+                .get_ivar::<NSInteger>("_shuffleType");
+            let Some(shuffle) = shuffle_from_apple(shuffle) else {
+                return MPRemoteCommandHandlerStatusCommandFailed;
+            };
+            (handler)(MediaControlEvent::SetShuffle(shuffle));
+            MPRemoteCommandHandlerStatusSuccess
+        }
+    });
+    attach!(changePlaybackRateCommand, {
+        let handler = handler.clone();
+        // event of type MPChangePlaybackRateCommand
+        move |event: id| -> NSInteger {
+            let rate = *event.as_ref().unwrap().get_ivar::<f32>("_playbackRate");
+            (handler)(MediaControlEvent::SetRate(rate as f64));
+            MPRemoteCommandHandlerStatusSuccess
+        }
+    });
+    attach_simple!(
+        seekBackwardCommand,
+        MediaControlEvent::Seek(SeekDirection::Backward)
+    );
+    attach_simple!(
+        seekForwardCommand,
+        MediaControlEvent::Seek(SeekDirection::Forward)
+    );
+    attach!(skipBackwardCommand, {
+        let handler = handler.clone();
+        // event of type MPSkipIntervalCommand
+        move |event: id| -> NSInteger {
+            let interval = *event.as_ref().unwrap().get_ivar::<f64>("_interval");
+            (handler)(MediaControlEvent::SeekBy(
+                SeekDirection::Backward,
+                Duration::from_secs_f64(interval),
+            ));
+            MPRemoteCommandHandlerStatusSuccess
+        }
+    });
+    attach!(skipForwardCommand, {
+        let handler = handler.clone();
+        // event of type MPSkipIntervalCommand
+        move |event: id| -> NSInteger {
+            let interval = *event.as_ref().unwrap().get_ivar::<f64>("_interval");
+            (handler)(MediaControlEvent::SeekBy(
+                SeekDirection::Forward,
+                Duration::from_secs_f64(interval),
+            ));
+            MPRemoteCommandHandlerStatusSuccess
+        }
+    });
     attach!(changePlaybackPositionCommand, {
         let handler = handler.clone();
         // event of type MPChangePlaybackPositionCommandEvent
@@ -514,6 +532,57 @@ unsafe fn attach_command_handlers(handler: Arc<dyn Fn(MediaControlEvent)>) {
             MPRemoteCommandHandlerStatusSuccess
         }
     });
+    // TODO:
+    // attach!(ratingCommand, {
+    //     let handler = handler.clone();
+    //     // event of type MPRatingCommand
+    //     move |event: id| -> NSInteger {
+    //         let position = *event.as_ref().unwrap().get_ivar::<f64>("_positionTime");
+    //         (handler)(MediaControlEvent::SetPosition(MediaPosition(
+    //             Duration::from_secs_f64(position),
+    //         )));
+    //         MPRemoteCommandHandlerStatusSuccess
+    //     }
+    // });
+    // attach!(likeCommand, {
+    //     let handler = handler.clone();
+    //     // event of type MPFeedbackCommand
+    //     move |event: id| -> NSInteger {
+    //         let position = *event.as_ref().unwrap().get_ivar::<f64>("_positionTime");
+    //         (handler)(MediaControlEvent::);
+    //         MPRemoteCommandHandlerStatusSuccess
+    //     }
+    // });
+    // attach!(dislikeCommand, {
+    //     let handler = handler.clone();
+    //     // event of type MPFeedbackCommand
+    //     move |event: id| -> NSInteger {
+    //         let position = *event.as_ref().unwrap().get_ivar::<f64>("_positionTime");
+    //         (handler)(MediaControlEvent::SetPosition(MediaPosition(
+    //             Duration::from_secs_f64(position),
+    //         )));
+    //         MPRemoteCommandHandlerStatusSuccess
+    //     }
+    // });
+    // attach!(bookmarkCommand, {
+    //     let handler = handler.clone();
+    //     // event of type MPFeedbackCommand
+    //     move |event: id| -> NSInteger {
+    //         let position = *event.as_ref().unwrap().get_ivar::<f64>("_positionTime");
+    //         (handler)(MediaControlEvent::SetPosition(MediaPosition(
+    //             Duration::from_secs_f64(position),
+    //         )));
+    //         MPRemoteCommandHandlerStatusSuccess
+    //     }
+    // });
+    // attach_simple!(
+    //     enableLanguageOptionCommand,
+    //     MediaControlEvent::LanguageOptionEnable(true)
+    // );
+    // attach_simple!(
+    //     disableLanguageOptionCommand,
+    //     MediaControlEvent::LanguageOptionEnable(false)
+    // );
 }
 
 unsafe fn detach_command_handlers() {
@@ -533,7 +602,19 @@ unsafe fn detach_command_handlers() {
     detach!(stopCommand);
     detach!(previousTrackCommand);
     detach!(nextTrackCommand);
+    detach!(changeRepeatModeCommand);
+    detach!(changeShuffleModeCommand);
+    detach!(changePlaybackRateCommand);
+    detach!(seekBackwardCommand);
+    detach!(seekForwardCommand);
+    detach!(skipBackwardCommand);
+    detach!(skipForwardCommand);
     detach!(changePlaybackPositionCommand);
+    // TODO
+    // detach!(ratingCommand);
+    // detach!(likeCommand);
+    // detach!(dislikeCommand);
+    // detach!(bookmarkCommand);
 }
 
 unsafe fn ns_string(value: &str) -> id {
@@ -550,11 +631,6 @@ unsafe fn ns_number_int(value: i32) -> id {
 
 unsafe fn ns_number_u64(value: u64) -> id {
     msg_send!(class!(NSNumber), numberWithUnsignedLong: value)
-}
-
-// TODO: is this okay?
-unsafe fn ns_bool(value: bool) -> id {
-    msg_send!(class!(NsNumber), numberWithBool: value)
 }
 
 unsafe fn ns_url(value: &str) -> id {

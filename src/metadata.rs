@@ -116,12 +116,6 @@ pub struct MediaMetadata {
     /// - **Windows:** Unsupported
     pub composers: Option<Vec<String>>,
 
-    /// Composer (single string)
-    /// - **MPRIS:** Unsupported
-    /// - **macOS/iOS:** `MPMediaItem.composer`
-    /// - **Windows:** Unsupported
-    pub composer: Option<String>,
-
     /// Lyricist(s) of the track
     /// - **MPRIS:** `xesam:lyricist`
     /// - **macOS/iOS:** Unsupported
@@ -130,7 +124,7 @@ pub struct MediaMetadata {
 
     /// Track lyrics
     /// - **MPRIS:** `xesam:asText`
-    /// - **macOS/iOS:** `MPMediaItem.lyrics`
+    /// - **macOS/iOS:** Unsupported
     /// - **Windows:** Unsupported
     pub lyrics: Option<String>,
 
@@ -140,15 +134,9 @@ pub struct MediaMetadata {
     /// - **Windows:** Unsupported
     pub comments: Option<Vec<String>>,
 
-    /// Comments about the media item (single string)
-    /// - **MPRIS:** Unsupported
-    /// - **macOS/iOS:** `MPMediaItem.comments`
-    /// - **Windows:** Unsupported
-    pub comment: Option<String>,
-
     /// Beats per minute (music tempo)
     /// - **MPRIS:** `xesam:audioBPM`
-    /// - **macOS/iOS:** `MPMediaItem.beatsPerMinute`
+    /// - **macOS/iOS:** Unsupported
     /// - **Windows:** Unsupported
     pub beats_per_minute: Option<i32>,
 
@@ -158,12 +146,6 @@ pub struct MediaMetadata {
     /// - **Windows:** Unsupported
     pub user_rating_01: Option<f64>,
 
-    /// User-specified rating of 0 to 5, inclusive
-    /// - **MPRIS:** Unsupported
-    /// - **macOS/iOS:** `MPMediaItem.rating`
-    /// - **Windows:** Unsupported
-    pub user_rating_05: Option<i32>,
-
     /// Automatically-generated rating based on things such as how often it has been played, of 0.0 to 1.0, inclusive
     /// - **MPRIS:** `xesam:autoRating`
     /// - **macOS/iOS:** Unsupported
@@ -172,15 +154,9 @@ pub struct MediaMetadata {
 
     /// Number of times the track has been played
     /// - **MPRIS:** `xesam:useCount`
-    /// - **macOS/iOS:** `MPMediaItem.playCount`
+    /// - **macOS/iOS:** Unsupported
     /// - **Windows:** Unsupported
     pub play_count: Option<i32>,
-
-    /// Number of times the track has been skipped
-    /// - **MPRIS:** Unsupported
-    /// - **macOS/iOS:** `MPMediaItem.skipCount`
-    /// - **Windows:** Unsupported
-    pub skip_count: Option<i32>,
 
     /// When the track was created (usually only year is useful)
     /// - **MPRIS:** `xesam:contentCreated`
@@ -194,27 +170,9 @@ pub struct MediaMetadata {
     /// - **Windows:** Unsupported
     pub first_played: Option<Date>,
 
-    /// When the track was last played
-    /// - **MPRIS:** `xesam:lastUsed`
-    /// - **macOS/iOS:** `MPMediaItem.lastPlayedDate`
-    /// - **Windows:** Unsupported
-    pub last_played: Option<Date>,
-
-    /// Date the media item was added to the library
-    /// - **MPRIS:** Unsupported
-    /// - **macOS/iOS:** `MPMediaItem.dateAdded`
-    /// - **Windows:** Unsupported
-    pub date_added: Option<Date>,
-
-    /// Release date of the media item
-    /// - **MPRIS:** Unsupported
-    /// - **macOS/iOS:** `MPMediaItem.releaseDate`
-    /// - **Windows:** Unsupported
-    pub release_date: Option<Date>,
-
     /// Location of the media file
     /// - **MPRIS:** `xesam:url`
-    /// - **macOS/iOS:** `MPMediaItem.assetURL`
+    /// - **macOS/iOS:** Unsupported
     /// - **Windows:** Unsupported
     pub media_url: Option<String>,
 
@@ -235,102 +193,6 @@ pub struct MediaMetadata {
     /// - **macOS/iOS:** `MPMediaItem.persistentID`
     /// - **Windows:** Unsupported
     pub media_persistent_id: Option<u64>,
-
-    /// Persistent identifier for the artist
-    /// - **MPRIS:** Unsupported
-    /// - **macOS/iOS:** `MPMediaItem.artistPersistentID`
-    /// - **Windows:** Unsupported
-    pub artist_persistent_id: Option<u64>,
-
-    /// Persistent identifier for the album
-    /// - **MPRIS:** Unsupported
-    /// - **macOS/iOS:** `MPMediaItem.albumPersistentID`
-    /// - **Windows:** Unsupported
-    pub album_persistent_id: Option<u64>,
-
-    /// Persistent identifier for the album artist
-    /// - **MPRIS:** Unsupported
-    /// - **macOS/iOS:** `MPMediaItem.albumArtistPersistentID`
-    /// - **Windows:** Unsupported
-    pub album_artist_persistent_id: Option<u64>,
-
-    /// Persistent identifier for the composer
-    /// - **MPRIS:** Unsupported
-    /// - **macOS/iOS:** `MPMediaItem.composerPersistentID`
-    /// - **Windows:** Unsupported
-    pub composer_persistent_id: Option<u64>,
-
-    /// Persistent identifier for the genre
-    /// - **MPRIS:** Unsupported
-    /// - **macOS/iOS:** `MPMediaItem.genrePersistentID`
-    /// - **Windows:** Unsupported
-    pub genre_persistent_id: Option<u64>,
-
-    /// Persistent identifier for a podcast
-    /// - **MPRIS:** Unsupported
-    /// - **macOS/iOS:** `MPMediaItem.podcastPersistentID`
-    /// - **Windows:** Unsupported
-    pub podcast_persistent_id: Option<u64>,
-
-    /// Media type for macOS/iOS (not an enum, but bitflags)
-    /// - **MPRIS:** Unsupported
-    /// - **macOS/iOS:** `MPMediaItem.mediaType`
-    /// - **Windows:** Unsupported
-    pub media_type_apple: Option<MediaTypeApple>,
-
-    /// Bookmark time for user's most recent interaction
-    /// - **MPRIS:** Unsupported
-    /// - **macOS/iOS:** `MPMediaItem.bookmarkTime` (converted to seconds)
-    /// - **Windows:** Unsupported
-    pub bookmark_time: Option<Duration>,
-
-    /// Whether the media item is a cloud/streaming item
-    /// - **MPRIS:** Unsupported
-    /// - **macOS/iOS:** `MPMediaItem.isCloudItem`
-    /// - **Windows:** Unsupported
-    pub is_cloud_item: Option<bool>,
-
-    /// Whether the media item is part of a compilation
-    /// - **MPRIS:** Unsupported
-    /// - **macOS/iOS:** `MPMediaItem.isCompilation`
-    /// - **Windows:** Unsupported
-    pub is_compilation: Option<bool>,
-
-    /// Whether the media item is a preorder
-    /// - **MPRIS:** Unsupported
-    /// - **macOS/iOS:** `MPMediaItem.isPreorder`
-    /// - **Windows:** Unsupported
-    pub is_preorder: Option<bool>,
-
-    /// Whether the media item has explicit content
-    /// - **MPRIS:** Unsupported
-    /// - **macOS/iOS:** `MPMediaItem.isExplicitItem`
-    /// - **Windows:** Unsupported
-    pub is_explicit: Option<bool>,
-
-    /// "When the value is true, the media item has DRM protection."
-    /// - **MPRIS:** Unsupported
-    /// - **macOS/iOS:** `MPMediaItem.hasProtectedAsset`
-    /// - **Windows:** Unsupported
-    pub has_protected_asset: Option<bool>,
-
-    /// "The ID of a media item from the Apple Music catalog."
-    /// - **MPRIS:** Unsupported
-    /// - **macOS/iOS:** `MPMediaItem.playbackStoreID`
-    /// - **Windows:** Unsupported
-    pub playback_store_id: Option<String>,
-
-    /// Podcast title
-    /// - **MPRIS:** Unsupported
-    /// - **macOS/iOS:** `MPMediaItem.podcastTitle`
-    /// - **Windows:** Unsupported
-    pub podcast_title: Option<String>,
-
-    /// "Corresponds to the “Grouping” field in the Info tab in the Get Info dialog in iTunes."
-    /// - **MPRIS:** Unsupported
-    /// - **macOS/iOS:** `MPMediaItem.userGrouping`
-    /// - **Windows:** Unsupported
-    pub user_grouping: Option<String>,
 
     /// Media type for Windows
     /// - **MPRIS:** Unsupported
@@ -378,42 +240,20 @@ impl Default for MediaMetadata {
             disc_count: None,
             duration: None,
             composers: None,
-            composer: None,
+
             lyricists: None,
             lyrics: None,
             comments: None,
-            comment: None,
             beats_per_minute: None,
             user_rating_01: None,
-            user_rating_05: None,
             auto_rating: None,
             play_count: None,
-            skip_count: None,
             content_created: None,
             first_played: None,
-            last_played: None,
-            date_added: None,
-            release_date: None,
             media_url: None,
             // For compatibility reasons
             // mpris_track_id: Some("/".to_owned()),
             media_persistent_id: None,
-            artist_persistent_id: None,
-            album_persistent_id: None,
-            album_artist_persistent_id: None,
-            composer_persistent_id: None,
-            genre_persistent_id: None,
-            podcast_persistent_id: None,
-            media_type_apple: None,
-            bookmark_time: None,
-            is_cloud_item: None,
-            is_compilation: None,
-            is_preorder: None,
-            is_explicit: None,
-            has_protected_asset: None,
-            playback_store_id: None,
-            podcast_title: None,
-            user_grouping: None,
             media_type_windows: None,
             app_media_id: None,
             subtitle: None,
@@ -435,39 +275,3 @@ pub enum MediaTypeWindows {
     Video = 2,
     Image = 3,
 }
-
-/// Converted to a bitflag in the macOS/iOS implementation
-#[derive(Clone, PartialEq, Eq, Debug, Default)]
-pub struct MediaTypeApple {
-    pub music: bool,
-    pub podcast: bool,
-    pub audio_book: bool,
-    pub audio_itunes_u: bool,
-    pub any_audio: bool,
-    pub movie: bool,
-    pub tv_show: bool,
-    pub video_podcast: bool,
-    pub music_video: bool,
-    pub video_itunes_u: bool,
-    pub home_video: bool,
-    pub any_video: bool,
-    pub any: bool,
-}
-
-// /// Location of artwork/album art image
-// /// - **MPRIS:** `mpris:artUrl`
-// /// - **macOS:** Unsupported (use `artwork` field)
-// /// - **Windows:** Unsupported (use `thumbnail` field)
-// pub art_url: Option<String>,
-
-// /// Artwork image data/object
-// /// - **MPRIS:** Unsupported (use `art_url` field)
-// /// - **macOS:** `MPMediaItem.artwork` (MPMediaItemArtwork)
-// /// - **Windows:** Unsupported (use `thumbnail` field)
-// pub artwork: Option<Vec<u8>>, // Platform-specific artwork data
-
-// /// Thumbnail image data/object
-// /// - **MPRIS:** Unsupported (use `art_url` field)
-// /// - **macOS:** Unsupported (use `artwork` field)
-// /// - **Windows:** `SystemMediaTransportControlsDisplayUpdater.Thumbnail`
-// pub thumbnail: Option<Vec<u8>>, // Platform-specific thumbnail data
