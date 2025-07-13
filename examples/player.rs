@@ -1,5 +1,6 @@
 use std::{sync::mpsc, thread::sleep, time::Duration};
 
+use souvlaki::MediaControls;
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -135,6 +136,7 @@ fn main() {
     // let cover = sample_data::cover_bytes();
 
     let (tx, rx) = mpsc::sync_channel(32);
+    // `souvlaki::MediaControls` trait must be in scope.
     let mut controls = souvlaki::OsMediaControls::new(config).unwrap();
     // Attach event handlers to our controls
     controls.attach(move |e| tx.send(e).unwrap()).unwrap();
@@ -239,9 +241,7 @@ fn main() {
                         SetRate(_) => todo!(),
                         SetShuffle(_) => todo!(),
                         SetRepeat(_) => todo!(),
-                        OpenUri(_) => {
-                            eprintln!("This example player does not support opening URIs");
-                        }
+                        OpenUri(_) => todo!(),
                         Raise => {
                             window.request_user_attention(Some(
                                 winit::window::UserAttentionType::Informational,
@@ -252,6 +252,10 @@ fn main() {
                             eprintln!("Quitting...");
                             return;
                         }
+                        FastForward => todo!(),
+                        Rewind => todo!(),
+                        ChannelUp => todo!(),
+                        ChannelDown => todo!(),
                     }
                 }
 

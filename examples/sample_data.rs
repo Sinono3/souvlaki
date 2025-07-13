@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use souvlaki::{MediaMetadata, MediaTypeApple, MediaTypeWindows};
+use souvlaki::{MediaMetadata, MediaTypeWindows};
 
 #[allow(dead_code)]
 fn main() {
@@ -44,15 +44,9 @@ pub fn base() -> MediaMetadata {
         disc_count: Some(1),
         lyricists: Some(vec!["Halstead".to_owned()]),
         user_rating_01: Some(0.8),
-        user_rating_05: Some(4),
         auto_rating: Some(0.7),
         play_count: Some(108),
-        skip_count: Some(23),
         media_url: Some("https://www.discogs.com/master/9478-Slowdive-Souvlaki".to_owned()),
-        media_type_apple: Some(MediaTypeApple {
-            music: true,
-            ..Default::default()
-        }),
         media_type_windows: Some(MediaTypeWindows::Music),
         // There are more metadata properties...
         ..Default::default()

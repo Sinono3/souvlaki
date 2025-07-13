@@ -1,4 +1,4 @@
-use souvlaki::{MediaControlEvent, OsMediaControls};
+use souvlaki::{MediaControlEvent, MediaControls, OsMediaControls};
 
 mod sample_data;
 
@@ -33,6 +33,7 @@ fn main() {
     ))]
     let config = ();
 
+    // `souvlaki::MediaControls` trait must be in scope.
     let mut controls = OsMediaControls::new(config).unwrap();
 
     // The closure must be Send and have a static lifetime.
@@ -41,7 +42,7 @@ fn main() {
         .unwrap();
 
     // Set the cover art.
-    controls.set_cover(Some(sample_data::cover())).unwrap();
+    controls.set_cover(sample_data::cover()).unwrap();
 
     // Update the media metadata.
     controls
