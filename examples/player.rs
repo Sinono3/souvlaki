@@ -142,7 +142,19 @@ fn main() {
             souvlaki::platform::windows::WindowsConfig {
                 hwnd: window.hwnd() as *mut std::ffi::c_void,
             },
-            (),
+            souvlaki::platform::windows::WindowsPermissions {
+                is_channel_down_enabled: false,
+                is_channel_up_enabled: false,
+                is_enabled: true,
+                is_fast_forward_enabled: false,
+                is_next_enabled: true,
+                is_pause_enabled: true,
+                is_play_enabled: true,
+                is_previous_enabled: true,
+                is_record_enabled: false,
+                is_rewind_enabled: false,
+                is_stop_enabled: true,
+            },
         )
     };
 

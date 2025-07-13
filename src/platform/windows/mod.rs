@@ -65,6 +65,39 @@ impl std::fmt::Debug for WindowsCover {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct WindowsPermissions {
+    pub is_channel_down_enabled: bool,
+    pub is_channel_up_enabled: bool,
+    pub is_enabled: bool,
+    pub is_fast_forward_enabled: bool,
+    pub is_next_enabled: bool,
+    pub is_pause_enabled: bool,
+    pub is_play_enabled: bool,
+    pub is_previous_enabled: bool,
+    pub is_record_enabled: bool,
+    pub is_rewind_enabled: bool,
+    pub is_stop_enabled: bool,
+}
+
+impl WindowsPermissions {
+    pub fn none() -> Self {
+        Self {
+            is_channel_down_enabled: false,
+            is_channel_up_enabled: false,
+            is_enabled: false,
+            is_fast_forward_enabled: false,
+            is_next_enabled: false,
+            is_pause_enabled: false,
+            is_play_enabled: false,
+            is_previous_enabled: false,
+            is_record_enabled: false,
+            is_rewind_enabled: false,
+            is_stop_enabled: false,
+        }
+    }
+}
+
 #[repr(i32)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 enum SmtcPlayback {
@@ -77,6 +110,7 @@ impl MediaControls for Windows {
     type Error = WindowsError;
     type PlatformConfig = WindowsConfig;
     type Cover = WindowsCover;
+    type Permissions = WindowsPermissions;
 
     fn new(config: Self::PlatformConfig) -> Result<Self, Self::Error> {
         let interop: ISystemMediaTransportControlsInterop = windows::core::factory::<
@@ -100,15 +134,7 @@ impl MediaControls for Windows {
     where
         F: Fn(MediaControlEvent) + Send + 'static,
     {
-        self.controls.SetIsEnabled(true)?;
-        self.controls.SetIsPlayEnabled(true)?;
-        self.controls.SetIsPauseEnabled(true)?;
-        self.controls.SetIsStopEnabled(true)?;
-        self.controls.SetIsNextEnabled(true)?;
-        self.controls.SetIsPreviousEnabled(true)?;
-        self.controls.SetIsFastForwardEnabled(true)?;
-        self.controls.SetIsRewindEnabled(true)?;
-
+        self.set_permissions(WindowsPermissions::none())?;
         let event_handler = Arc::new(Mutex::new(event_handler));
 
         let button_handler = TypedEventHandler::new({
@@ -209,7 +235,7 @@ impl MediaControls for Windows {
     }
 
     fn detach(&mut self) -> Result<(), Self::Error> {
-        self.controls.SetIsEnabled(false)?;
+        self.set_permissions(WindowsPermissions::none())?;
         if let Some(ref handlers) = self.handlers {
             self.controls.RemoveButtonPressed(handlers.button)?;
             self.controls
@@ -222,6 +248,37 @@ impl MediaControls for Windows {
                 .RemoveAutoRepeatModeChangeRequested(handlers.repeat)?;
         }
         self.handlers = None;
+        Ok(())
+    }
+
+    fn set_permissions(&mut self, permissions: Self::Permissions) -> Result<(), Self::Error> {
+        let Self::Permissions {
+            is_channel_down_enabled,
+            is_channel_up_enabled,
+            is_enabled,
+            is_fast_forward_enabled,
+            is_next_enabled,
+            is_pause_enabled,
+            is_play_enabled,
+            is_previous_enabled,
+            is_record_enabled,
+            is_rewind_enabled,
+            is_stop_enabled,
+        } = permissions;
+
+        self.controls
+            .SetIsChannelDownEnabled(is_channel_down_enabled)?;
+        self.controls.SetIsChannelUpEnabled(is_channel_up_enabled)?;
+        self.controls.SetIsEnabled(is_enabled)?;
+        self.controls
+            .SetIsFastForwardEnabled(is_fast_forward_enabled)?;
+        self.controls.SetIsNextEnabled(is_next_enabled)?;
+        self.controls.SetIsPauseEnabled(is_pause_enabled)?;
+        self.controls.SetIsPlayEnabled(is_play_enabled)?;
+        self.controls.SetIsPreviousEnabled(is_previous_enabled)?;
+        self.controls.SetIsRecordEnabled(is_record_enabled)?;
+        self.controls.SetIsRewindEnabled(is_rewind_enabled)?;
+        self.controls.SetIsStopEnabled(is_stop_enabled)?;
         Ok(())
     }
 

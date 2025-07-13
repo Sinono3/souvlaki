@@ -8,22 +8,64 @@ fn main() {
         unix,
         not(any(target_os = "macos", target_os = "ios", target_os = "android"))
     ))]
-    let config = souvlaki::platform::mpris::MprisConfig {
-        display_name: "Souvlaki Player".to_owned(),
-        dbus_name: "souvlaki_player".to_owned(),
+    let (config, permissions) = {
+        (
+            souvlaki::platform::mpris::MprisConfig {
+                display_name: "Souvlaki Player".to_owned(),
+                dbus_name: "souvlaki_player".to_owned(),
+            },
+            (),
+        )
     };
 
-    // macOS platform
+    // macOS/iOS platform
     #[cfg(any(target_os = "macos", target_os = "ios"))]
-    let config = ();
+    let (config, permissions) = {
+        (
+            (),
+            souvlaki::platform::apple::ApplePermissions {
+                toggle_play_pause: true,
+                play: true,
+                pause: true,
+                stop: true,
+                previous_track: true,
+                next_track: true,
+                change_repeat_mode: false,
+                change_shuffle_mode: false,
+                change_playback_rate: false,
+                seek_backward: false,
+                seek_forward: false,
+                skip_backward: false,
+                skip_forward: false,
+                change_playback_position: true,
+            },
+        )
+    };
 
     // Windows platform
     #[cfg(target_os = "windows")]
-    let (config, _dummy_window) = {
+    let (config, permissions, _dummy_window) = {
         let dummy_window = windows::DummyWindow::new().unwrap();
         let handle = dummy_window.handle.0 as _;
         let config = souvlaki::platform::windows::WindowsConfig { hwnd: handle };
-        (config, dummy_window)
+
+        (
+            config,
+            souvlaki::platform::windows::WindowsPermissions {
+                is_channel_down_enabled: false,
+                is_channel_up_enabled: false,
+                is_enabled: true,
+                is_fast_forward_enabled: false,
+                is_next_enabled: true,
+                is_pause_enabled: true,
+                is_play_enabled: true,
+                is_previous_enabled: true,
+                is_record_enabled: false,
+                is_rewind_enabled: false,
+                is_stop_enabled: true,
+            },
+            dummy_window,
+        )
     };
 
     // Dummy platform (for unsupported OSes)
@@ -40,6 +82,8 @@ fn main() {
     controls
         .attach(|event: MediaControlEvent| println!("Event received: {:?}", event))
         .unwrap();
+
+    controls.set_permissions(permissions).unwrap();
 
     // Set the cover art.
     controls.set_cover(sample_data::cover()).unwrap();
