@@ -223,6 +223,7 @@ pub struct MediaMetadata {
     pub subtitle: Option<String>,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for MediaMetadata {
     fn default() -> Self {
         Self {

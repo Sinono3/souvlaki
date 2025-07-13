@@ -100,22 +100,50 @@ fn main() {
         unix,
         not(any(target_os = "macos", target_os = "ios", target_os = "android"))
     ))]
-    let config = souvlaki::platform::mpris::MprisConfig {
-        display_name: "Souvlaki Player".to_owned(),
-        dbus_name: "souvlaki_player".to_owned(),
+    let (config, permissions) = {
+        (
+            souvlaki::platform::mpris::MprisConfig {
+                display_name: "Souvlaki Player".to_owned(),
+                dbus_name: "souvlaki_player".to_owned(),
+            },
+            (),
+        )
     };
 
     // macOS/iOS platform
     #[cfg(any(target_os = "macos", target_os = "ios"))]
-    let config = ();
+    let (config, permissions) = {
+        (
+            (),
+            souvlaki::platform::apple::ApplePermissions {
+                toggle_play_pause: true,
+                play: true,
+                pause: true,
+                stop: true,
+                previous_track: true,
+                next_track: true,
+                change_repeat_mode: false,
+                change_shuffle_mode: false,
+                change_playback_rate: false,
+                seek_backward: false,
+                seek_forward: false,
+                skip_backward: false,
+                skip_forward: false,
+                change_playback_position: true,
+            },
+        )
+    };
 
     // Windows platform
     #[cfg(target_os = "windows")]
-    let config = {
+    let (config, permissions) = {
         use winit::platform::windows::WindowExtWindows;
-        souvlaki::platform::windows::WindowsConfig {
-            hwnd: window.hwnd() as *mut std::ffi::c_void,
-        }
+        (
+            souvlaki::platform::windows::WindowsConfig {
+                hwnd: window.hwnd() as *mut std::ffi::c_void,
+            },
+            (),
+        )
     };
 
     // Dummy platform (for unsupported OSes)
@@ -123,7 +151,7 @@ fn main() {
         not(any(unix, target_os = "macos", target_os = "ios", target_os = "windows")),
         target_os = "android",
     ))]
-    let config = ();
+    let (config, permissions) = ((), ());
 
     let mut app = TestApp {
         songs: sample_data::album().to_vec(),
@@ -140,6 +168,9 @@ fn main() {
     let mut controls = souvlaki::OsMediaControls::new(config).unwrap();
     // Attach event handlers to our controls
     controls.attach(move |e| tx.send(e).unwrap()).unwrap();
+
+    // After we attach, we need to set enable/disable specific media controls
+    controls.set_permissions(permissions).unwrap();
 
     // Set playback status
     controls

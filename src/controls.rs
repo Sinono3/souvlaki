@@ -8,6 +8,7 @@ pub trait MediaControls: Sized + Debug {
     type Error: Error + Debug;
     type PlatformConfig: Debug;
     type Cover: Clone + Debug;
+    type Permissions: Clone + PartialEq + Debug;
 
     /// Create media controls with the specified config.
     fn new(config: Self::PlatformConfig) -> Result<Self, Self::Error>;
@@ -17,6 +18,8 @@ pub trait MediaControls: Sized + Debug {
         F: Fn(MediaControlEvent) + Send + 'static;
     /// Detach the event handler.
     fn detach(&mut self) -> Result<(), Self::Error>;
+    /// Set permissions, i.e. whether play/pause, next, previous are available.
+    fn set_permissions(&mut self, permissions: Self::Permissions) -> Result<(), Self::Error>;
     /// Set the current playback status.
     fn set_playback(&mut self, playback: MediaPlayback) -> Result<(), Self::Error>;
     /// Set the metadata of the current media item.
@@ -50,6 +53,7 @@ impl<T: MediaControls> MediaControls for MediaControlsWrapper<T> {
     type Error = T::Error;
     type PlatformConfig = T::PlatformConfig;
     type Cover = T::Cover;
+    type Permissions = T::Permissions;
 
     fn new(config: T::PlatformConfig) -> Result<Self, T::Error> {
         Ok(Self {
@@ -64,6 +68,9 @@ impl<T: MediaControls> MediaControls for MediaControlsWrapper<T> {
     }
     fn detach(&mut self) -> Result<(), T::Error> {
         self.inner.detach()
+    }
+    fn set_permissions(&mut self, permissions: T::Permissions) -> Result<(), T::Error> {
+        self.inner.set_permissions(permissions)
     }
     fn set_playback(&mut self, playback: MediaPlayback) -> Result<(), T::Error> {
         self.inner.set_playback(playback)
