@@ -199,11 +199,6 @@ impl MediaControls for Apple {
         // unsupported, ignoring.
         Ok(())
     }
-
-    fn set_rate_limits(&mut self, _min: f64, _max: f64) -> Result<(), Self::Error> {
-        // unsupported, ignoring.
-        Ok(())
-    }
 }
 
 // MPNowPlayingPlaybackState

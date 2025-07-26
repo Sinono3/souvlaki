@@ -34,11 +34,8 @@ pub trait MediaControls: Sized + Debug {
     fn set_volume(&mut self, volume: f64) -> Result<(), Self::Error>;
     /// Set the playback rate, e.g. 0.5x, 1.0x, 2.0x.
     fn set_rate(&mut self, rate: f64) -> Result<(), Self::Error>;
-    /// Set the maximum allowed playback rate.
-    /// - max: should always be 1.0 or more
-    /// - min: should always be 1.0 or less
-    /// Only events received within these limits will be sent to the application handler.
-    fn set_rate_limits(&mut self, min: f64, max: f64) -> Result<(), Self::Error>;
+    /// Set whether the app is fullscreen.
+    fn set_fullscreen(&mut self, rate: bool) -> Result<(), Self::Error>;
 }
 
 /// NOTE: Use this wrapper instead of the platform-specific control structs.
@@ -93,8 +90,8 @@ impl<T: MediaControls> MediaControls for MediaControlsWrapper<T> {
     fn set_rate(&mut self, rate: f64) -> Result<(), T::Error> {
         self.inner.set_rate(rate)
     }
-    fn set_rate_limits(&mut self, min: f64, max: f64) -> Result<(), T::Error> {
-        self.inner.set_rate_limits(min, max)
+    fn set_fullscreen(&mut self, fullscreen: bool) -> Result<(), T::Error> {
+        self.inner.set_fullscreen(fullscreen)
     }
 }
 

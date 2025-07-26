@@ -1,5 +1,6 @@
 #![doc = include_str!("../README.md")]
 
+use std::convert::TryFrom;
 use std::{fmt::Debug, time::Duration};
 
 mod controls;
@@ -28,6 +29,9 @@ pub enum MediaControlEvent {
     /// Seek forward or backward by a certain amount.
     SeekBy(SeekDirection, Duration),
     /// Set the position/progress of the currently playing media item.
+    /// **NOTE**: If the request was handled, and the property
+    /// was changed, [`MediaControls::set_playback`] must be called
+    /// with the new progress value.
     SetPosition(MediaPosition),
     /// Set the volume. The value is intended to be from 0.0 to 1.0.
     /// But other values are also accepted. **It is up to the
@@ -59,6 +63,11 @@ pub enum MediaControlEvent {
     Raise,
     /// Shut down the media player.
     Quit,
+    /// Control whether the app is fullscreen or not
+    /// **NOTE**: If the request was handled, and the property
+    /// was changed, [`MediaControls::set_fullscreen`] must be called
+    /// with the new value.
+    SetFullscreen(bool),
 
     /// Windows-specific
     FastForward,
@@ -86,6 +95,18 @@ impl MediaPlayback {
             Paused { .. } => "Paused",
             Stopped => "Stopped",
         }
+    }
+    pub fn to_micros(&self) -> i64 {
+        i64::try_from(match self {
+            MediaPlayback::Playing {
+                progress: Some(progress),
+            }
+            | MediaPlayback::Paused {
+                progress: Some(progress),
+            } => progress.0.as_micros(),
+            _ => 0,
+        })
+        .unwrap_or(0)
     }
 }
 

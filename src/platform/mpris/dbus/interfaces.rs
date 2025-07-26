@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
-    convert::{TryFrom, TryInto},
-    sync::{Arc, Mutex},
+    convert::TryFrom,
+    sync::{mpsc, Arc, Mutex},
     time::Duration,
 };
 
@@ -9,282 +9,243 @@ use dbus::{
     arg::{RefArg, Variant},
     Path,
 };
-use dbus_crossroads::{Crossroads, IfaceBuilder};
+use dbus_crossroads::{Context, Crossroads};
 
-use crate::{MediaControlEvent, MediaPlayback, MediaPosition, Repeat, SeekDirection};
+use crate::{MediaControlEvent, MediaPosition, Repeat, SeekDirection};
 
-use super::super::ServiceState;
+use super::super::{MprisConfig, ServiceState};
 
 // TODO: This type is super messed up, but it's the only way to get seeking working properly
 // on graphical media controls using dbus-crossroads.
-pub type SeekedSignal =
-    Arc<Mutex<Option<Box<dyn Fn(&Path<'_>, &(String,)) -> dbus::Message + Send + Sync>>>>;
+pub type SeekedSignal = Box<dyn Fn(&Path<'_>, &(i64,)) -> dbus::Message + Send + Sync>;
 
 pub(super) fn register_methods<F>(
     state: &Arc<Mutex<ServiceState>>,
     event_handler: &Arc<Mutex<F>>,
-    friendly_name: String,
-    seeked_signal: SeekedSignal,
+    config: MprisConfig,
+    seeked_signal_tx: mpsc::Sender<SeekedSignal>,
 ) -> Crossroads
 where
     F: Fn(MediaControlEvent) + Send + 'static,
 {
+    macro_rules! method_const {
+        ($b:ident, $name:expr, $event:expr) => {
+            let event_handler = event_handler.clone();
+            $b.method($name, (), (), move |_, _, _: ()| {
+                (event_handler.lock().unwrap())($event);
+                Ok(())
+            });
+        };
+    }
+
+    macro_rules! method {
+        ($b:ident, $name:expr, $args:expr, $out:expr, $handle:expr) => {
+            let event_handler = event_handler.clone();
+            $b.method($name, $args, $out, move |ctx, _, value| {
+                let event = ($handle)(ctx, value);
+                if let Some(event) = event {
+                    (event_handler.lock().unwrap())(event);
+                }
+                Ok(())
+            });
+        };
+    }
+
+    macro_rules! prop_const {
+        // Return a constant value
+        ($b:ident, $name:expr, $value:expr) => {
+            let value = $value.to_owned();
+            $b.property($name)
+                .get({ move |_, _| Ok(value.clone()) })
+                .emits_changed_true();
+        };
+    }
+    macro_rules! prop {
+        // Get (retrieve from state)
+        ($b:ident, $name:expr, $get:expr) => {
+            $b.property($name)
+                .get({
+                    let state = state.clone();
+                    move |_, _| {
+                        let state: &ServiceState = &*state.lock().unwrap();
+                        Ok(($get)(state))
+                    }
+                })
+                .emits_changed_true();
+        };
+        // Get (retrieve from state) and set (send media control event)
+        ($b:ident, $name:expr, $get:expr, $set:expr) => {
+            $b.property($name)
+                .get({
+                    let state = state.clone();
+                    move |_, _| {
+                        let state: &ServiceState = &*state.lock().unwrap();
+                        Ok(($get)(state))
+                    }
+                })
+                .set({
+                    let event_handler = event_handler.clone();
+                    move |_, _, value| {
+                        let event = $set(value);
+                        if let Some(event) = event {
+                            (event_handler.lock().unwrap())(event);
+                        }
+                        Ok(None)
+                    }
+                })
+                .emits_changed_true();
+        };
+    }
+
     let mut cr = Crossroads::new();
     let app_interface = cr.register("org.mpris.MediaPlayer2", {
-        let event_handler = event_handler.clone();
-
         move |b| {
-            b.property("Identity")
-                .get(move |_, _| Ok(friendly_name.clone()));
+            method_const!(b, "Raise", MediaControlEvent::Raise);
+            method_const!(b, "Quit", MediaControlEvent::Quit);
 
-            register_method(b, &event_handler, "Raise", MediaControlEvent::Raise);
-            register_method(b, &event_handler, "Quit", MediaControlEvent::Quit);
-
-            // TODO: allow user to set these properties
-            b.property("CanQuit")
-                .get(|_, _| Ok(true))
-                .emits_changed_true();
-            b.property("CanRaise")
-                .get(|_, _| Ok(true))
-                .emits_changed_true();
-            b.property("HasTracklist")
-                .get(|_, _| Ok(false))
-                .emits_changed_true();
-            b.property("SupportedUriSchemes")
-                .get(move |_, _| Ok(&[] as &[String]))
-                .emits_changed_true();
-            b.property("SupportedMimeTypes")
-                .get(move |_, _| Ok(&[] as &[String]))
-                .emits_changed_true();
+            prop!(b, "CanQuit", |state: &ServiceState| state
+                .permissions
+                .can_quit);
+            prop!(
+                b,
+                "Fullscreen",
+                |state: &ServiceState| state.fullscreen,
+                |fullscreen: bool| Some(MediaControlEvent::SetFullscreen(fullscreen))
+            );
+            prop!(b, "CanSetFullscreen", |state: &ServiceState| state
+                .permissions
+                .can_set_fullscreen);
+            prop!(b, "CanRaise", |state: &ServiceState| state
+                .permissions
+                .can_raise);
+            prop!(b, "HasTrackList", |_state: &ServiceState| false);
+            prop_const!(b, "Identity", config.identity);
+            prop_const!(b, "DesktopEntry", config.desktop_entry);
+            prop!(b, "SupportedUriSchemes", |state: &ServiceState| state
+                .permissions
+                .supported_uri_schemes
+                .iter()
+                .map(|s| s.to_string())
+                .collect::<Vec<String>>());
+            prop!(b, "SupportedMimeTypes", |state: &ServiceState| state
+                .permissions
+                .supported_mime_types
+                .iter()
+                .map(|s| s.to_string())
+                .collect::<Vec<String>>());
         }
     });
 
     let player_interface = cr.register("org.mpris.MediaPlayer2.Player", |b| {
-        register_method(b, event_handler, "Next", MediaControlEvent::Next);
-        register_method(b, event_handler, "Previous", MediaControlEvent::Previous);
-        register_method(b, event_handler, "Pause", MediaControlEvent::Pause);
-        register_method(b, event_handler, "PlayPause", MediaControlEvent::Toggle);
-        register_method(b, event_handler, "Stop", MediaControlEvent::Stop);
-        register_method(b, event_handler, "Play", MediaControlEvent::Play);
+        method_const!(b, "Next", MediaControlEvent::Next);
+        method_const!(b, "Previous", MediaControlEvent::Previous);
+        method_const!(b, "Pause", MediaControlEvent::Pause);
+        method_const!(b, "PlayPause", MediaControlEvent::Toggle);
+        method_const!(b, "Stop", MediaControlEvent::Stop);
+        method_const!(b, "Play", MediaControlEvent::Play);
 
-        b.method("Seek", ("Offset",), (), {
-            let event_handler = event_handler.clone();
-
-            move |ctx, _, (offset,): (i64,)| {
+        method!(
+            b,
+            "Seek",
+            ("Offset",),
+            (),
+            move |_ctx: &mut Context, (offset,): (i64,)| {
                 let abs_offset = offset.unsigned_abs();
                 let direction = if offset > 0 {
                     SeekDirection::Forward
                 } else {
                     SeekDirection::Backward
                 };
-
-                (event_handler.lock().unwrap())(MediaControlEvent::SeekBy(
+                Some(MediaControlEvent::SeekBy(
                     direction,
                     Duration::from_micros(abs_offset),
-                ));
-                ctx.push_msg(ctx.make_signal("Seeked", ()));
-                Ok(())
+                ))
             }
-        });
-
-        b.method("SetPosition", ("TrackId", "Position"), (), {
-            let state = state.clone();
-            let event_handler = event_handler.clone();
-
-            move |_, _, (_trackid, position): (Path, i64)| {
-                let state = state.lock().unwrap();
-
-                // According to the MPRIS specification:
-
-                // TODO: If the TrackId argument is not the same as the current
-                // trackid, the call is ignored as stale.
-                // (Maybe it should be optional?)
-
-                if let Some(duration) = state.metadata.duration {
-                    // If the Position argument is greater than the track length, do nothing.
-                    if position > duration.as_micros().try_into().unwrap() {
-                        return Ok(());
-                    }
-                }
-
-                // If the Position argument is less than 0, do nothing.
+        );
+        method!(b, "SetPosition", ("TrackId", "Position"), (), {
+            move |_ctx: &mut Context, (_trackid, position): (Path, i64)| {
+                // if the `Position` argument is less than 0, do nothing.
                 if let Ok(position) = u64::try_from(position) {
                     let position = Duration::from_micros(position);
 
-                    (event_handler.lock().unwrap())(MediaControlEvent::SetPosition(MediaPosition(
-                        position,
-                    )));
+                    Some(MediaControlEvent::SetPosition(MediaPosition(position)))
+                } else {
+                    None
                 }
-                Ok(())
             }
         });
-
-        b.method("OpenUri", ("Uri",), (), {
-            let event_handler = event_handler.clone();
-
-            move |_, _, (uri,): (String,)| {
-                (event_handler.lock().unwrap())(MediaControlEvent::OpenUri(uri));
-                Ok(())
-            }
+        method!(b, "OpenUri", ("Uri",), (), {
+            move |_ctx: &mut Context, (uri,): (String,)| Some(MediaControlEvent::OpenUri(uri))
         });
 
-        *seeked_signal.lock().unwrap() = Some(b.signal::<(String,), _>("Seeked", ("x",)).msg_fn());
+        // need to send this signature to our caller... clunky but it's what can be done
+        seeked_signal_tx
+            .send(b.signal::<(i64,), _>("Seeked", ("x",)).msg_fn())
+            .unwrap();
 
-        b.property("PlaybackStatus")
-            .get({
-                let state = state.clone();
-                move |_, _| {
-                    let state = state.lock().unwrap();
-                    Ok(state.playback_status.to_dbus_value().to_string())
-                }
-            })
-            .emits_changed_true();
-
-        b.property("LoopStatus")
-            .get({
-                let state = state.clone();
-                move |_, _| {
-                    let state = state.lock().unwrap();
-                    Ok(state.loop_status.to_dbus_value().to_string())
-                }
-            })
-            .set({
-                let event_handler = event_handler.clone();
-                move |_, _, loop_status_dbus: String| {
-                    let Some(repeat) = Repeat::from_dbus_value(&loop_status_dbus) else {
-                        // If invalid, just ignore it
-                        return Ok(None);
-                    };
-                    (event_handler.lock().unwrap())(MediaControlEvent::SetRepeat(repeat));
-                    Ok(Some(loop_status_dbus))
-                }
-            })
-            .emits_changed_true();
-
-        b.property("Rate")
-            .get({
-                let state = state.clone();
-                move |_, _| {
-                    let state = state.lock().unwrap();
-                    Ok(state.rate)
-                }
-            })
-            .set({
-                let event_handler = event_handler.clone();
-                move |_, _, rate: f64| {
-                    (event_handler.lock().unwrap())(MediaControlEvent::SetRate(rate));
-                    Ok(Some(rate))
-                }
-            })
-            .emits_changed_true();
-
-        b.property("Shuffle")
-            .get({
-                let state = state.clone();
-                move |_, _| {
-                    let state = state.lock().unwrap();
-                    Ok(state.shuffle)
-                }
-            })
-            .set({
-                let event_handler = event_handler.clone();
-                move |_, _, shuffle: bool| {
-                    (event_handler.lock().unwrap())(MediaControlEvent::SetShuffle(shuffle));
-                    Ok(Some(shuffle))
-                }
-            })
-            .emits_changed_true();
-
-        b.property("Metadata")
-            .get({
-                let state = state.clone();
-                move |_, _| {
-                    let state = state.lock().unwrap();
-                    // Manually clone...
-                    let metadata_dict: HashMap<_, _> = state
-                        .metadata_dict
-                        .iter()
-                        .map(|(k, v)| (k.to_owned(), Variant(v.box_clone())))
-                        .collect();
-                    Ok(metadata_dict)
-                }
-            })
-            .emits_changed_true();
-
-        b.property("Volume")
-            .get({
-                let state = state.clone();
-                move |_, _| {
-                    let state = state.lock().unwrap();
-                    Ok(state.volume)
-                }
-            })
-            .set({
-                let event_handler = event_handler.clone();
-                move |_, _, volume: f64| {
-                    (event_handler.lock().unwrap())(MediaControlEvent::SetVolume(volume));
-                    Ok(Some(volume))
-                }
-            })
-            .emits_changed_true();
-
-        b.property("Position").get({
-            let state = state.clone();
-            move |_, _| {
-                let state = state.lock().unwrap();
-                let progress: i64 = match state.playback_status {
-                    MediaPlayback::Playing {
-                        progress: Some(progress),
-                    }
-                    | MediaPlayback::Paused {
-                        progress: Some(progress),
-                    } => progress.0.as_micros(),
-                    _ => 0,
-                }
-                .try_into()
-                .unwrap();
-                Ok(progress)
+        prop!(b, "PlaybackStatus", |state: &ServiceState| state
+            .playback_status
+            .to_dbus_value()
+            .to_owned());
+        prop!(
+            b,
+            "LoopStatus",
+            |state: &ServiceState| state.loop_status.to_dbus_value().to_owned(),
+            |loop_status_dbus: String| {
+                // If invalid, just ignore it
+                Repeat::from_dbus_value(&loop_status_dbus)
+                    .map(|repeat| MediaControlEvent::SetRepeat(repeat))
             }
+        );
+        prop!(b, "Rate", |state: &ServiceState| state.rate, |rate: f64| {
+            Some(MediaControlEvent::SetRate(rate))
         });
-
-        b.property("MaximumRate")
-            .get({
-                let state = state.clone();
-                move |_, _| {
-                    let state = state.lock().unwrap();
-                    Ok(state.maximum_rate)
-                }
-            })
-            .emits_changed_true();
-        b.property("MinimumRate")
-            .get({
-                let state = state.clone();
-                move |_, _| {
-                    let state = state.lock().unwrap();
-                    Ok(state.minimum_rate)
-                }
-            })
-            .emits_changed_true();
-
-        // TODO: Control capabilities
-        b.property("CanGoNext")
-            .get(|_, _| Ok(true))
-            .emits_changed_true();
-        b.property("CanGoPrevious")
-            .get(|_, _| Ok(true))
-            .emits_changed_true();
-        b.property("CanPlay")
-            .get(|_, _| Ok(true))
-            .emits_changed_true();
-        b.property("CanPause")
-            .get(|_, _| Ok(true))
-            .emits_changed_true();
-        b.property("CanSeek")
-            .get(|_, _| Ok(true))
-            .emits_changed_true();
-        b.property("CanControl")
-            .get(|_, _| Ok(true))
-            .emits_changed_true();
+        prop!(
+            b,
+            "Shuffle",
+            |state: &ServiceState| state.shuffle,
+            |shuffle: bool| { Some(MediaControlEvent::SetShuffle(shuffle)) }
+        );
+        prop!(b, "Metadata", |state: &ServiceState| {
+            state
+                .metadata_dict
+                .iter()
+                .map(|(k, v)| (k.to_owned(), Variant(v.box_clone())))
+                .collect::<HashMap<_, _>>()
+        });
+        prop!(
+            b,
+            "Volume",
+            |state: &ServiceState| state.volume,
+            |volume: f64| { Some(MediaControlEvent::SetVolume(volume)) }
+        );
+        prop!(b, "Position", |state: &ServiceState| state
+            .playback_status
+            .to_micros());
+        prop!(b, "MinimumRate", |state: &ServiceState| state
+            .permissions
+            .min_rate);
+        prop!(b, "MaximumRate", |state: &ServiceState| state
+            .permissions
+            .max_rate);
+        prop!(b, "CanGoNext", |state: &ServiceState| state
+            .permissions
+            .can_go_next);
+        prop!(b, "CanGoPrevious", |state: &ServiceState| state
+            .permissions
+            .can_go_previous);
+        prop!(b, "CanPlay", |state: &ServiceState| state
+            .permissions
+            .can_play);
+        prop!(b, "CanPause", |state: &ServiceState| state
+            .permissions
+            .can_pause);
+        prop!(b, "CanSeek", |state: &ServiceState| state
+            .permissions
+            .can_seek);
+        prop!(b, "CanControl", |state: &ServiceState| state
+            .permissions
+            .can_control);
     });
 
     cr.insert(
@@ -292,24 +253,5 @@ where
         &[app_interface, player_interface],
         (),
     );
-
-    seeked_signal.lock().ok();
-
     cr
-}
-
-fn register_method<F>(
-    b: &mut IfaceBuilder<()>,
-    event_handler: &Arc<Mutex<F>>,
-    name: &'static str,
-    event: MediaControlEvent,
-) where
-    F: Fn(MediaControlEvent) + Send + 'static,
-{
-    let event_handler = event_handler.clone();
-
-    b.method(name, (), (), move |_, _, _: ()| {
-        (event_handler.lock().unwrap())(event.clone());
-        Ok(())
-    });
 }

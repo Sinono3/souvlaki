@@ -11,10 +11,25 @@ fn main() {
     let (config, permissions) = {
         (
             souvlaki::platform::mpris::MprisConfig {
-                display_name: "Souvlaki Player".to_owned(),
+                identity: "Souvlaki Player".to_owned(),
                 dbus_name: "souvlaki_player".to_owned(),
+                desktop_entry: "souvlaki".to_owned(),
             },
-            (),
+            souvlaki::platform::mpris::MprisPermissions {
+                can_quit: true,
+                can_set_fullscreen: true,
+                can_raise: true,
+                supported_uri_schemes: vec![],
+                supported_mime_types: vec![],
+                can_go_next: true,
+                can_go_previous: true,
+                can_play: true,
+                can_pause: true,
+                can_seek: true,
+                can_control: true,
+                min_rate: 1.0,
+                max_rate: 1.0,
+            },
         )
     };
 

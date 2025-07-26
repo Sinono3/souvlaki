@@ -7,7 +7,7 @@ Sources:
 
 - Some desktop environments natively support image data URLs in `mpris:artUrl`,
 	but we have no way to verify this via the specification as it is.
-	Using HTTP URLs or local file URLs is safer.
+	Using local file URLs or alternatively HTTP URLs may be safer.
 
 ## org.mpris.MediaPlayer2
 

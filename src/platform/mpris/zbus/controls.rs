@@ -7,15 +7,15 @@ use zbus::connection;
 use zbus::zvariant::ObjectPath;
 
 use super::super::{
-    create_metadata_dict, InternalEvent, MprisCover, MprisError, ServiceState, ServiceThreadHandle,
+    create_metadata_dict, InternalEvent, MprisConfig, MprisCover, MprisError, ServiceState,
+    ServiceThreadHandle,
 };
 use super::{AppInterface, PlayerInterface};
 use crate::MediaControlEvent;
 
 pub(in super::super) fn spawn_thread<F>(
     event_handler: F,
-    dbus_name: String,
-    friendly_name: String,
+    config: MprisConfig,
     event_channel: mpsc::Sender<InternalEvent>,
     rx: mpsc::Receiver<InternalEvent>,
 ) -> Result<ServiceThreadHandle, MprisError>
@@ -24,15 +24,12 @@ where
 {
     Ok(ServiceThreadHandle {
         event_channel,
-        thread: thread::spawn(move || {
-            pollster::block_on(run_service(dbus_name, friendly_name, event_handler, rx))
-        }),
+        thread: thread::spawn(move || pollster::block_on(run_service(config, event_handler, rx))),
     })
 }
 
 async fn run_service<F>(
-    dbus_name: String,
-    friendly_name: String,
+    config: MprisConfig,
     event_handler: F,
     event_channel: mpsc::Receiver<InternalEvent>,
 ) -> Result<(), MprisError>
@@ -40,17 +37,20 @@ where
     F: Fn(MediaControlEvent) + Send + 'static,
 {
     let event_handler = Arc::new(Mutex::new(event_handler));
+    let state = Arc::new(Mutex::new(ServiceState::default()));
+
     let app = AppInterface {
-        friendly_name,
+        config: config.clone(),
+        state: state.clone(),
         event_handler: event_handler.clone(),
     };
 
     let player = PlayerInterface {
-        state: ServiceState::default(),
+        state: state.clone(),
         event_handler,
     };
 
-    let name = format!("org.mpris.MediaPlayer2.{dbus_name}");
+    let name = format!("org.mpris.MediaPlayer2.{}", &config.dbus_name);
     let path = ObjectPath::try_from("/org/mpris/MediaPlayer2").unwrap();
     let connection = connection::Builder::session()?
         .serve_at(&path, app)?
@@ -61,54 +61,109 @@ where
 
     loop {
         while let Ok(event) = event_channel.recv_timeout(Duration::from_millis(10)) {
-            let interface_ref = connection
+            let player_ref = connection
                 .object_server()
                 .interface::<_, PlayerInterface>(&path)
                 .await?;
-            let mut interface = interface_ref.get_mut().await;
-            let emitter = interface_ref.signal_emitter();
+            let player = player_ref.get_mut().await;
+            let p_emit = player_ref.signal_emitter();
+            let app_ref = connection
+                .object_server()
+                .interface::<_, AppInterface>(&path)
+                .await?;
+            let app = app_ref.get_mut().await;
+            let a_emit = app_ref.signal_emitter();
 
             match event {
+                InternalEvent::SetPermissions(permissions) => {
+                    let mut state = state.lock().unwrap();
+                    // Check this one-by-one
+                    if state.permissions.can_quit != permissions.can_quit {
+                        app.can_quit_changed(a_emit).await?;
+                    }
+                    if state.permissions.can_set_fullscreen != permissions.can_set_fullscreen {
+                        app.can_set_fullscreen_changed(a_emit).await?;
+                    }
+                    if state.permissions.can_raise != permissions.can_raise {
+                        app.can_raise_changed(a_emit).await?;
+                    }
+                    if state.permissions.supported_uri_schemes != permissions.supported_uri_schemes
+                    {
+                        app.supported_uri_schemes_changed(a_emit).await?;
+                    }
+                    if state.permissions.supported_mime_types != permissions.supported_mime_types {
+                        app.supported_mime_types_changed(a_emit).await?;
+                    }
+                    if state.permissions.can_go_next != permissions.can_go_next {
+                        player.can_go_next_changed(p_emit).await?;
+                    }
+                    if state.permissions.can_go_previous != permissions.can_go_previous {
+                        player.can_go_previous_changed(p_emit).await?;
+                    }
+                    if state.permissions.can_play != permissions.can_play {
+                        player.can_play_changed(p_emit).await?;
+                    }
+                    if state.permissions.can_pause != permissions.can_pause {
+                        player.can_pause_changed(p_emit).await?;
+                    }
+                    if state.permissions.can_seek != permissions.can_seek {
+                        player.can_seek_changed(p_emit).await?;
+                    }
+                    if state.permissions.can_control != permissions.can_control {
+                        player.can_control_changed(p_emit).await?;
+                    }
+                    if state.permissions.max_rate != permissions.max_rate {
+                        player.maximum_rate_changed(p_emit).await?;
+                    }
+                    if state.permissions.min_rate != permissions.min_rate {
+                        player.minimum_rate_changed(p_emit).await?;
+                    }
+
+                    state.permissions = permissions;
+                }
                 InternalEvent::SetMetadata(metadata) => {
-                    interface.state.metadata_dict =
-                        create_metadata_dict(&metadata, &interface.state.cover_url);
-                    interface.state.metadata = metadata;
-                    interface.metadata_changed(emitter).await?;
+                    let mut state = state.lock().unwrap();
+                    state.metadata_dict = create_metadata_dict(&metadata, &state.cover_url);
+                    state.metadata = metadata;
+                    player.metadata_changed(p_emit).await?;
                 }
                 InternalEvent::SetCover(cover) => {
                     let cover_url = MprisCover::to_url(cover);
-                    interface.state.metadata_dict =
-                        create_metadata_dict(&interface.state.metadata, &cover_url);
-                    interface.state.cover_url = cover_url;
-                    interface.metadata_changed(emitter).await?;
+                    let mut state = state.lock().unwrap();
+                    state.metadata_dict = create_metadata_dict(&state.metadata, &cover_url);
+                    state.cover_url = cover_url;
+                    player.metadata_changed(p_emit).await?;
                 }
                 InternalEvent::SetPlayback(playback) => {
-                    interface.state.playback_status = playback;
-                    interface.playback_status_changed(emitter).await?;
+                    let mut state = state.lock().unwrap();
+                    state.playback_status = playback;
+                    player.playback_status_changed(p_emit).await?;
+                    player.seeked(p_emit).await?;
                 }
                 InternalEvent::SetLoopStatus(loop_status) => {
-                    interface.state.loop_status = loop_status;
-                    interface.loop_status_changed(emitter).await?;
+                    let mut state = state.lock().unwrap();
+                    state.loop_status = loop_status;
+                    player.loop_status_changed(p_emit).await?;
                 }
                 InternalEvent::SetRate(rate) => {
-                    interface.state.rate = rate;
-                    interface.rate_changed(emitter).await?;
+                    let mut state = state.lock().unwrap();
+                    state.rate = rate;
+                    player.rate_changed(p_emit).await?;
                 }
                 InternalEvent::SetShuffle(shuffle) => {
-                    interface.state.shuffle = shuffle;
-                    interface.shuffle_changed(emitter).await?;
+                    let mut state = state.lock().unwrap();
+                    state.shuffle = shuffle;
+                    player.shuffle_changed(p_emit).await?;
                 }
                 InternalEvent::SetVolume(volume) => {
-                    interface.state.volume = volume;
-                    interface.volume_changed(emitter).await?;
+                    let mut state = state.lock().unwrap();
+                    state.volume = volume;
+                    player.volume_changed(p_emit).await?;
                 }
-                InternalEvent::SetMaximumRate(rate) => {
-                    interface.state.maximum_rate = rate;
-                    interface.maximum_rate_changed(emitter).await?;
-                }
-                InternalEvent::SetMinimumRate(rate) => {
-                    interface.state.minimum_rate = rate;
-                    interface.minimum_rate_changed(emitter).await?;
+                InternalEvent::SetFullscreen(fullscreen) => {
+                    let mut state = state.lock().unwrap();
+                    state.fullscreen = fullscreen;
+                    app.fullscreen_changed(a_emit).await?;
                 }
                 InternalEvent::Kill => return Ok(()),
             }

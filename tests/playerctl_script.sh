@@ -24,7 +24,7 @@ playerctl loop Playlist
 
 # The following are commands not supported by playerctl, thus we use dbus-send
 call() {
-  dbus-send --dest=org.mpris.MediaPlayer2.my_player --print-reply /org/mpris/MediaPlayer2 "$1"
+  dbus-send --dest=org.mpris.MediaPlayer2.souvlaki_player --print-reply /org/mpris/MediaPlayer2 "$1"
 }
 
 call org.mpris.MediaPlayer2.Raise

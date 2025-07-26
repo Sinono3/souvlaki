@@ -13,12 +13,17 @@ mod zbus;
 mod dbus;
 
 /// MPRIS-specific configuration needed to create media controls.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct MprisConfig {
-    /// The name to be displayed to the user.
-    pub display_name: String,
     /// Should follow [the D-Bus spec](https://dbus.freedesktop.org/doc/dbus-specification.html#message-protocol-names-bus).
     pub dbus_name: String,
+    /// A friendly name to identify the media player to users.
+    /// This should usually match the name found in .desktop files
+    /// (eg: "VLC media player").
+    pub identity: String,
+    /// The basename of an installed .desktop file which complies with the Desktop entry specification, with the ".desktop" extension stripped.
+    /// Example: The desktop entry file is "/usr/share/applications/vlc.desktop", and this property contains "vlc"
+    pub desktop_entry: String,
 }
 
 /// A platform-specific error.
@@ -76,6 +81,47 @@ impl MprisCover {
     }
 }
 
+/// Permissions determining which actions can the user take.
+/// Souvlaki does not actually enforce any of them, it just
+/// displays them on the D-Bus interface.
+/// We leave it up to the application code to enforcement.
+#[derive(Clone, Debug, PartialEq)]
+pub struct MprisPermissions {
+    pub can_quit: bool,
+    pub can_set_fullscreen: bool,
+    pub can_raise: bool,
+    pub supported_uri_schemes: Vec<&'static str>,
+    pub supported_mime_types: Vec<&'static str>,
+    pub can_go_next: bool,
+    pub can_go_previous: bool,
+    pub can_play: bool,
+    pub can_pause: bool,
+    pub can_seek: bool,
+    pub can_control: bool,
+    pub min_rate: f64,
+    pub max_rate: f64,
+}
+
+impl MprisPermissions {
+    pub fn none() -> Self {
+        Self {
+            can_quit: false,
+            can_set_fullscreen: false,
+            can_raise: false,
+            supported_uri_schemes: vec![],
+            supported_mime_types: vec![],
+            can_go_next: false,
+            can_go_previous: false,
+            can_play: false,
+            can_pause: false,
+            can_seek: false,
+            can_control: false,
+            min_rate: 1.0,
+            max_rate: 1.0,
+        }
+    }
+}
+
 use crate::{MediaControlEvent, MediaControls};
 use crate::{MediaMetadata, MediaPlayback, Repeat};
 use std::collections::HashMap;
@@ -88,6 +134,7 @@ struct ServiceThreadHandle {
 
 #[derive(Clone, Debug)]
 pub(crate) enum InternalEvent {
+    SetPermissions(MprisPermissions),
     SetMetadata(MediaMetadata),
     SetCover(Option<MprisCover>),
     SetPlayback(MediaPlayback),
@@ -95,8 +142,7 @@ pub(crate) enum InternalEvent {
     SetRate(f64),
     SetShuffle(bool),
     SetVolume(f64),
-    SetMaximumRate(f64),
-    SetMinimumRate(f64),
+    SetFullscreen(bool),
     Kill,
 }
 
@@ -105,10 +151,10 @@ type MetadataDict = HashMap<String, ::dbus::arg::Variant<Box<dyn ::dbus::arg::Re
 #[cfg(platform_mpris_zbus)]
 type MetadataDict = HashMap<String, ::zbus::zvariant::OwnedValue>;
 
-// TODO: This is public only due to how rust modules work...
-// should not actually be seen by the library user
 #[derive(Debug)]
 struct ServiceState {
+    permissions: MprisPermissions,
+    fullscreen: bool,
     playback_status: MediaPlayback,
     loop_status: Repeat,
     rate: f64,
@@ -117,8 +163,6 @@ struct ServiceState {
     metadata_dict: MetadataDict,
     cover_url: Option<String>,
     volume: f64,
-    maximum_rate: f64,
-    minimum_rate: f64,
 }
 
 impl Default for ServiceState {
@@ -127,6 +171,8 @@ impl Default for ServiceState {
         let metadata_dict = create_metadata_dict(&metadata, &None);
 
         Self {
+            permissions: MprisPermissions::none(),
+            fullscreen: false,
             playback_status: MediaPlayback::Stopped,
             loop_status: Repeat::None,
             rate: 1.0,
@@ -135,8 +181,6 @@ impl Default for ServiceState {
             metadata_dict,
             cover_url: None,
             volume: 1.0,
-            maximum_rate: 1.0,
-            minimum_rate: 1.0,
         }
     }
 }
@@ -144,8 +188,7 @@ impl Default for ServiceState {
 /// A handle to OS media controls.
 pub struct Mpris {
     thread: Option<ServiceThreadHandle>,
-    dbus_name: String,
-    friendly_name: String,
+    config: MprisConfig,
 }
 
 impl Mpris {
@@ -173,17 +216,12 @@ impl MediaControls for Mpris {
     type Error = MprisError;
     type PlatformConfig = MprisConfig;
     type Cover = MprisCover;
+    type Permissions = MprisPermissions;
 
     fn new(config: Self::PlatformConfig) -> Result<Self, Self::Error> {
-        let Self::PlatformConfig {
-            dbus_name,
-            display_name,
-        } = config;
-
         Ok(Self {
             thread: None,
-            dbus_name: dbus_name.to_string(),
-            friendly_name: display_name.to_string(),
+            config,
         })
     }
 
@@ -193,16 +231,14 @@ impl MediaControls for Mpris {
     {
         self.detach()?;
 
-        let dbus_name = self.dbus_name.clone();
-        let friendly_name = self.friendly_name.clone();
         let (event_channel, rx) = mpsc::channel();
 
         #[cfg(platform_mpris_dbus)]
         let thread =
-            self::dbus::spawn_thread(event_handler, dbus_name, friendly_name, event_channel, rx)?;
+            self::dbus::spawn_thread(event_handler, self.config.clone(), event_channel, rx)?;
         #[cfg(platform_mpris_zbus)]
         let thread =
-            self::zbus::spawn_thread(event_handler, dbus_name, friendly_name, event_channel, rx)?;
+            self::zbus::spawn_thread(event_handler, self.config.clone(), event_channel, rx)?;
 
         self.thread = Some(thread);
         Ok(())
@@ -248,10 +284,12 @@ impl MediaControls for Mpris {
         self.send_internal_event(InternalEvent::SetVolume(volume))
     }
 
-    fn set_rate_limits(&mut self, min: f64, max: f64) -> Result<(), Self::Error> {
-        self.send_internal_event(InternalEvent::SetMinimumRate(min))?;
-        self.send_internal_event(InternalEvent::SetMaximumRate(max))?;
-        Ok(())
+    fn set_permissions(&mut self, permissions: Self::Permissions) -> Result<(), Self::Error> {
+        self.send_internal_event(InternalEvent::SetPermissions(permissions))
+    }
+
+    fn set_fullscreen(&mut self, fullscreen: bool) -> Result<(), Self::Error> {
+        self.send_internal_event(InternalEvent::SetFullscreen(fullscreen))
     }
 }
 

@@ -432,11 +432,6 @@ impl MediaControls for Windows {
     fn set_rate(&mut self, rate: f64) -> Result<(), Self::Error> {
         self.controls.SetPlaybackRate(rate)
     }
-
-    fn set_rate_limits(&mut self, _min: f64, _max: f64) -> Result<(), Self::Error> {
-        // Unsupported by Windows. No-op.
-        Ok(())
-    }
 }
 
 fn create_stream_from_bytes(data: Vec<u8>) -> Result<IRandomAccessStream, WindowsError> {
