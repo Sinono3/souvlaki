@@ -432,6 +432,11 @@ impl MediaControls for Windows {
     fn set_rate(&mut self, rate: f64) -> Result<(), Self::Error> {
         self.controls.SetPlaybackRate(rate)
     }
+
+    fn set_fullscreen(&mut self, _fullscreen: bool) -> Result<(), Self::Error> {
+        // unsupported, ignoring.
+        Ok(())
+    }
 }
 
 fn create_stream_from_bytes(data: Vec<u8>) -> Result<IRandomAccessStream, WindowsError> {

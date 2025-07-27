@@ -35,7 +35,7 @@ pub trait MediaControls: Sized + Debug {
     /// Set the playback rate, e.g. 0.5x, 1.0x, 2.0x.
     fn set_rate(&mut self, rate: f64) -> Result<(), Self::Error>;
     /// Set whether the app is fullscreen.
-    fn set_fullscreen(&mut self, rate: bool) -> Result<(), Self::Error>;
+    fn set_fullscreen(&mut self, fullscreen: bool) -> Result<(), Self::Error>;
 }
 
 /// NOTE: Use this wrapper instead of the platform-specific control structs.

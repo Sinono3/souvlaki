@@ -199,6 +199,11 @@ impl MediaControls for Apple {
         // unsupported, ignoring.
         Ok(())
     }
+
+    fn set_fullscreen(&mut self, _fullscreen: bool) -> Result<(), Self::Error> {
+        // unsupported, ignoring.
+        Ok(())
+    }
 }
 
 // MPNowPlayingPlaybackState
