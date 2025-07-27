@@ -147,7 +147,7 @@ impl PlayerInterface {
     }
 
     #[zbus(signal)]
-    pub async fn seeked(&self, _emitter: &SignalEmitter<'_>) -> zbus::Result<()>;
+    pub async fn seeked(&self, _emitter: &SignalEmitter<'_>, position: i64) -> zbus::Result<()>;
 
     #[zbus(property)]
     fn playback_status(&self) -> &'static str {

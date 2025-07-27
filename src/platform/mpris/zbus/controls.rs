@@ -88,7 +88,7 @@ where
                     {
                         let mut state = state.write().unwrap();
                         old_permissions =
-                            mem::replace(&mut state.permissions, new_permissions.clone());
+                            mem::replace(&mut state.permissions, (*new_permissions).clone());
                     }
 
                     // Check this one-by-one
@@ -140,7 +140,7 @@ where
                     {
                         let mut state = state.write().unwrap();
                         state.metadata_dict = create_metadata_dict(&metadata, &state.cover_url);
-                        state.metadata = metadata;
+                        state.metadata = *metadata;
                     }
                     player.metadata_changed(p_emit).await?;
                 }
@@ -154,12 +154,13 @@ where
                     player.metadata_changed(p_emit).await?;
                 }
                 InternalEvent::SetPlayback(playback) => {
+                    let micros = playback.to_micros();
                     {
                         let mut state = state.write().unwrap();
                         state.playback_status = playback;
-                        player.playback_status_changed(p_emit).await?;
                     }
-                    player.seeked(p_emit).await?;
+                    player.playback_status_changed(p_emit).await?;
+                    player.seeked(p_emit, micros).await?;
                 }
                 InternalEvent::SetLoopStatus(loop_status) => {
                     {

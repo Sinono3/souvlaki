@@ -133,8 +133,8 @@ struct ServiceThreadHandle {
 
 #[derive(Clone, Debug)]
 pub(crate) enum InternalEvent {
-    SetPermissions(MprisPermissions),
-    SetMetadata(MediaMetadata),
+    SetPermissions(Box<MprisPermissions>),
+    SetMetadata(Box<MediaMetadata>),
     SetCover(Option<MprisCover>),
     SetPlayback(MediaPlayback),
     SetLoopStatus(Repeat),
@@ -148,7 +148,7 @@ pub(crate) enum InternalEvent {
 #[cfg(platform_mpris_dbus)]
 type MetadataDict = ::dbus::arg::PropMap;
 #[cfg(platform_mpris_zbus)]
-type MetadataDict = HashMap<String, ::zbus::zvariant::OwnedValue>;
+type MetadataDict = std::collections::HashMap<String, ::zbus::zvariant::OwnedValue>;
 
 #[derive(Debug)]
 struct ServiceState {
@@ -260,7 +260,7 @@ impl MediaControls for Mpris {
     }
 
     fn set_metadata(&mut self, metadata: MediaMetadata) -> Result<(), Self::Error> {
-        self.send_internal_event(InternalEvent::SetMetadata(metadata))
+        self.send_internal_event(InternalEvent::SetMetadata(Box::new(metadata)))
     }
 
     fn set_cover(&mut self, cover: Option<Self::Cover>) -> Result<(), Self::Error> {
@@ -284,7 +284,7 @@ impl MediaControls for Mpris {
     }
 
     fn set_permissions(&mut self, permissions: Self::Permissions) -> Result<(), Self::Error> {
-        self.send_internal_event(InternalEvent::SetPermissions(permissions))
+        self.send_internal_event(InternalEvent::SetPermissions(Box::new(permissions)))
     }
 
     fn set_fullscreen(&mut self, fullscreen: bool) -> Result<(), Self::Error> {

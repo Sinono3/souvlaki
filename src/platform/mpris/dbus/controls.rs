@@ -156,12 +156,12 @@ where
                         );
                     }
 
-                    state.permissions = permissions;
+                    state.permissions = *permissions;
                 }
                 InternalEvent::SetMetadata(metadata) => {
                     let mut state = state.lock().unwrap();
                     state.metadata_dict = create_metadata_dict(&metadata, &state.cover_url);
-                    state.metadata = metadata;
+                    state.metadata = *metadata;
                     player_properties_changed.insert(
                         "Metadata".to_owned(),
                         Variant(state.metadata_dict.box_clone()),
@@ -220,7 +220,7 @@ where
                 InternalEvent::Kill => return Ok(()),
             }
 
-            if app_properties_changed.len() > 0 {
+            if !app_properties_changed.is_empty() {
                 let app_properties_changed = PropertiesPropertiesChanged {
                     interface_name: "org.mpris.MediaPlayer2".to_owned(),
                     changed_properties: app_properties_changed,
@@ -230,7 +230,7 @@ where
                     .ok();
             }
 
-            if player_properties_changed.len() > 0 {
+            if !player_properties_changed.is_empty() {
                 let player_properties_changed = PropertiesPropertiesChanged {
                     interface_name: "org.mpris.MediaPlayer2.Player".to_owned(),
                     changed_properties: player_properties_changed,

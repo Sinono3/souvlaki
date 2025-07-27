@@ -1,14 +1,10 @@
 use std::{
-    collections::HashMap,
     convert::TryFrom,
     sync::{mpsc, Arc, Mutex},
     time::Duration,
 };
 
-use dbus::{
-    arg::{RefArg, Variant},
-    Path,
-};
+use dbus::Path;
 use dbus_crossroads::{Context, Crossroads};
 
 use crate::{MediaControlEvent, MediaPosition, Repeat, SeekDirection};
@@ -39,10 +35,11 @@ where
     }
 
     macro_rules! method {
-        ($b:ident, $name:expr, $args:expr, $out:expr, $handle:expr) => {
+        ($b:ident, $name:expr, $args:expr, $out:expr, $handler:expr) => {
+            let handler = $handler;
             let event_handler = event_handler.clone();
             $b.method($name, $args, $out, move |ctx, _, value| {
-                let event = ($handle)(ctx, value);
+                let event = (handler)(ctx, value);
                 if let Some(event) = event {
                     (event_handler.lock().unwrap())(event);
                 }
@@ -63,30 +60,34 @@ where
     macro_rules! prop {
         // Get (retrieve from state)
         ($b:ident, $name:expr, $get:expr) => {
+            let get = $get;
             $b.property($name)
                 .get({
                     let state = state.clone();
                     move |_, _| {
                         let state: &ServiceState = &*state.lock().unwrap();
-                        Ok(($get)(state))
+                        Ok((get)(state))
                     }
                 })
                 .emits_changed_true();
         };
         // Get (retrieve from state) and set (send media control event)
         ($b:ident, $name:expr, $get:expr, $set:expr) => {
+            let get = $get;
+            let set = $set;
+
             $b.property($name)
                 .get({
                     let state = state.clone();
                     move |_, _| {
                         let state: &ServiceState = &*state.lock().unwrap();
-                        Ok(($get)(state))
+                        Ok((get)(state))
                     }
                 })
                 .set({
                     let event_handler = event_handler.clone();
                     move |_, _, value| {
-                        let event = $set(value);
+                        let event = (set)(value);
                         if let Some(event) = event {
                             (event_handler.lock().unwrap())(event);
                         }
@@ -193,8 +194,7 @@ where
             |state: &ServiceState| state.loop_status.to_dbus_value().to_owned(),
             |loop_status_dbus: String| {
                 // If invalid, just ignore it
-                Repeat::from_dbus_value(&loop_status_dbus)
-                    .map(|repeat| MediaControlEvent::SetRepeat(repeat))
+                Repeat::from_dbus_value(&loop_status_dbus).map(MediaControlEvent::SetRepeat)
             }
         );
         prop!(b, "Rate", |state: &ServiceState| state.rate, |rate: f64| {
