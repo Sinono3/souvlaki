@@ -13,7 +13,7 @@ use dbus_crossroads::{Context, Crossroads};
 
 use crate::{MediaControlEvent, MediaPosition, Repeat, SeekDirection};
 
-use super::super::{MprisConfig, ServiceState};
+use super::super::{create_metadata_dict, MprisConfig, ServiceState};
 
 // TODO: This type is super messed up, but it's the only way to get seeking working properly
 // on graphical media controls using dbus-crossroads.
@@ -180,7 +180,7 @@ where
 
         // need to send this signature to our caller... clunky but it's what can be done
         seeked_signal_tx
-            .send(b.signal::<(i64,), _>("Seeked", ("x",)).msg_fn())
+            .send(b.signal::<(i64,), _>("Seeked", ("Position",)).msg_fn())
             .unwrap();
 
         prop!(b, "PlaybackStatus", |state: &ServiceState| state
@@ -206,13 +206,10 @@ where
             |state: &ServiceState| state.shuffle,
             |shuffle: bool| { Some(MediaControlEvent::SetShuffle(shuffle)) }
         );
-        prop!(b, "Metadata", |state: &ServiceState| {
-            state
-                .metadata_dict
-                .iter()
-                .map(|(k, v)| (k.to_owned(), Variant(v.box_clone())))
-                .collect::<HashMap<_, _>>()
-        });
+        prop!(b, "Metadata", |state: &ServiceState| create_metadata_dict(
+            &state.metadata,
+            &state.cover_url
+        ));
         prop!(
             b,
             "Volume",

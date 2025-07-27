@@ -3,7 +3,7 @@
 
 alias playerctl="playerctl -p souvlaki_player "
 
-playerctl metadata
+playerctl metadata | sort
 playerctl play
 playerctl pause
 playerctl play-pause
@@ -29,3 +29,5 @@ call() {
 
 call org.mpris.MediaPlayer2.Raise
 call org.mpris.MediaPlayer2.Quit
+
+# TODO: need to add all properties.

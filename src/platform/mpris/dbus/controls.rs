@@ -69,7 +69,7 @@ where
             match event {
                 InternalEvent::SetPermissions(permissions) => {
                     let mut state = state.lock().unwrap();
-                    // Check this one-by-one
+
                     if state.permissions.can_quit != permissions.can_quit {
                         app_properties_changed.insert(
                             "CanQuit".to_owned(),
@@ -156,7 +156,7 @@ where
                         );
                     }
 
-                    state.permissions = permissions; // TODO: Check each manually
+                    state.permissions = permissions;
                 }
                 InternalEvent::SetMetadata(metadata) => {
                     let mut state = state.lock().unwrap();

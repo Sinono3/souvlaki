@@ -124,7 +124,6 @@ impl MprisPermissions {
 
 use crate::{MediaControlEvent, MediaControls};
 use crate::{MediaMetadata, MediaPlayback, Repeat};
-use std::collections::HashMap;
 use std::{sync::mpsc, thread::JoinHandle};
 
 struct ServiceThreadHandle {
@@ -147,7 +146,7 @@ pub(crate) enum InternalEvent {
 }
 
 #[cfg(platform_mpris_dbus)]
-type MetadataDict = HashMap<String, ::dbus::arg::Variant<Box<dyn ::dbus::arg::RefArg>>>;
+type MetadataDict = ::dbus::arg::PropMap;
 #[cfg(platform_mpris_zbus)]
 type MetadataDict = HashMap<String, ::zbus::zvariant::OwnedValue>;
 
@@ -342,7 +341,7 @@ macro_rules! build_metadata_dict {
             ..
         } = $metadata;
 
-        // TODO: Workaround to enable SetPosition.
+        // TODO: Allow setting this track id. Check out #73
         dict.insert("mpris:trackid".to_string(), ($wrap)($trackid_value));
 
         let mut insert = |k, v| dict.insert(k, v);

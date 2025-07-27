@@ -4,7 +4,7 @@ use std::time::Duration;
 /// These contains the simple text-based, easy-to-represent metadata fields.
 /// Thumbnails/artwork/cover art are not set here. See instead [`MediaControls::set_cover`].
 ///
-/// The philosophy for this struct is: give fine-grained control to the library user.
+/// The philosophy for this struct is: give fine-grained control to the application code.
 /// Instead of the library doing the work of e.g. concatenating the `artists` field `Vec<String>`
 /// into a `String` to support platforms which don't have first-class support for
 /// multiple artists, we give you the option of filling these fields yourself.

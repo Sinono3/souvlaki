@@ -1,6 +1,6 @@
 use std::convert::From;
-use std::convert::{TryInto, TryFrom};
-use std::sync::{Arc, Mutex};
+use std::convert::{TryFrom, TryInto};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 
 use zbus::interface;
@@ -11,7 +11,7 @@ use crate::{MediaControlEvent, MediaPlayback, MediaPosition, Repeat, SeekDirecti
 
 pub(super) struct AppInterface {
     pub config: MprisConfig,
-    pub state: Arc<Mutex<ServiceState>>,
+    pub state: Arc<RwLock<ServiceState>>,
     pub event_handler: Arc<Mutex<dyn Fn(MediaControlEvent) + Send + 'static>>,
 }
 
@@ -26,13 +26,13 @@ impl AppInterface {
 
     #[zbus(property)]
     fn can_quit(&self) -> bool {
-        let state = self.state.lock().unwrap();
+        let state = self.state.read().unwrap();
         state.permissions.can_quit
     }
 
     #[zbus(property)]
     fn fullscreen(&self) -> bool {
-        let state = self.state.lock().unwrap();
+        let state = self.state.read().unwrap();
         state.fullscreen
     }
 
@@ -43,18 +43,18 @@ impl AppInterface {
 
     #[zbus(property)]
     fn can_set_fullscreen(&self) -> bool {
-        let state = self.state.lock().unwrap();
+        let state = self.state.read().unwrap();
         state.permissions.can_set_fullscreen
     }
 
     #[zbus(property)]
     fn can_raise(&self) -> bool {
-        let state = self.state.lock().unwrap();
+        let state = self.state.read().unwrap();
         state.permissions.can_raise
     }
 
     #[zbus(property)]
-    fn has_tracklist(&self) -> bool {
+    fn has_track_list(&self) -> bool {
         // TODO: check issue #73
         false
     }
@@ -71,13 +71,13 @@ impl AppInterface {
 
     #[zbus(property)]
     fn supported_uri_schemes(&self) -> Vec<&str> {
-        let state = self.state.lock().unwrap();
+        let state = self.state.read().unwrap();
         state.permissions.supported_uri_schemes.to_vec()
     }
 
     #[zbus(property)]
     fn supported_mime_types(&self) -> Vec<&str> {
-        let state = self.state.lock().unwrap();
+        let state = self.state.read().unwrap();
         state.permissions.supported_mime_types.to_vec()
     }
 }
@@ -89,7 +89,7 @@ impl AppInterface {
 }
 
 pub(super) struct PlayerInterface {
-    pub state: Arc<Mutex<ServiceState>>,
+    pub state: Arc<RwLock<ServiceState>>,
     pub event_handler: Arc<Mutex<dyn Fn(MediaControlEvent) + Send + 'static>>,
 }
 
@@ -136,7 +136,9 @@ impl PlayerInterface {
 
     fn set_position(&self, _track_id: zbus::zvariant::ObjectPath, position: i64) {
         if let Ok(position) = u64::try_from(position) {
-            self.send_event(MediaControlEvent::SetPosition(MediaPosition(Duration::from_micros(position))));
+            self.send_event(MediaControlEvent::SetPosition(MediaPosition(
+                Duration::from_micros(position),
+            )));
         }
     }
 
@@ -149,13 +151,13 @@ impl PlayerInterface {
 
     #[zbus(property)]
     fn playback_status(&self) -> &'static str {
-        let state = self.state.lock().unwrap();
+        let state = self.state.read().unwrap();
         state.playback_status.to_dbus_value()
     }
 
     #[zbus(property)]
     fn loop_status(&self) -> &'static str {
-        let state = self.state.lock().unwrap();
+        let state = self.state.read().unwrap();
         state.loop_status.to_dbus_value()
     }
 
@@ -168,7 +170,7 @@ impl PlayerInterface {
 
     #[zbus(property)]
     fn rate(&self) -> f64 {
-        let state = self.state.lock().unwrap();
+        let state = self.state.read().unwrap();
         state.rate
     }
 
@@ -179,7 +181,7 @@ impl PlayerInterface {
 
     #[zbus(property)]
     fn shuffle(&self) -> bool {
-        let state = self.state.lock().unwrap();
+        let state = self.state.read().unwrap();
         state.shuffle
     }
 
@@ -190,13 +192,13 @@ impl PlayerInterface {
 
     #[zbus(property)]
     fn metadata(&self) -> MetadataDict {
-        let state = self.state.lock().unwrap();
+        let state = self.state.read().unwrap();
         state.metadata_dict.clone()
     }
 
     #[zbus(property)]
     fn volume(&self) -> f64 {
-        let state = self.state.lock().unwrap();
+        let state = self.state.read().unwrap();
         state.volume
     }
 
@@ -207,7 +209,7 @@ impl PlayerInterface {
 
     #[zbus(property)]
     fn position(&self) -> i64 {
-        let state = self.state.lock().unwrap();
+        let state = self.state.read().unwrap();
         let position = match state.playback_status {
             MediaPlayback::Playing {
                 progress: Some(pos),
@@ -223,49 +225,49 @@ impl PlayerInterface {
 
     #[zbus(property)]
     fn maximum_rate(&self) -> f64 {
-        let state = self.state.lock().unwrap();
+        let state = self.state.read().unwrap();
         state.permissions.max_rate
     }
 
     #[zbus(property)]
     fn minimum_rate(&self) -> f64 {
-        let state = self.state.lock().unwrap();
+        let state = self.state.read().unwrap();
         state.permissions.min_rate
     }
 
     #[zbus(property)]
     fn can_go_next(&self) -> bool {
-        let state = self.state.lock().unwrap();
+        let state = self.state.read().unwrap();
         state.permissions.can_go_next
     }
 
     #[zbus(property)]
     fn can_go_previous(&self) -> bool {
-        let state = self.state.lock().unwrap();
+        let state = self.state.read().unwrap();
         state.permissions.can_go_previous
     }
 
     #[zbus(property)]
     fn can_play(&self) -> bool {
-        let state = self.state.lock().unwrap();
+        let state = self.state.read().unwrap();
         state.permissions.can_play
     }
 
     #[zbus(property)]
     fn can_pause(&self) -> bool {
-        let state = self.state.lock().unwrap();
+        let state = self.state.read().unwrap();
         state.permissions.can_pause
     }
 
     #[zbus(property)]
     fn can_seek(&self) -> bool {
-        let state = self.state.lock().unwrap();
+        let state = self.state.read().unwrap();
         state.permissions.can_seek
     }
 
     #[zbus(property)]
     fn can_control(&self) -> bool {
-        let state = self.state.lock().unwrap();
+        let state = self.state.read().unwrap();
         state.permissions.can_control
     }
 }

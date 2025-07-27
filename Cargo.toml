@@ -10,7 +10,7 @@ license = "MIT"
 rust-version = "1.77"
 
 [features]
-default = ["mpris_zbus", "mpris_base64_data_url"]
+default = ["mpris_dbus", "mpris_base64_data_url"]
 date = ["time"]
 mpris_dbus = ["dbus", "dbus-crossroads"]
 mpris_zbus = ["zbus", "pollster"]
