@@ -4,6 +4,8 @@
 
 A cross-platform library for handling OS media controls and metadata. One abstraction for Linux, MacOS/iOS, Windows.
 
+![Architecture diagram for souvlaki.](docs/architecture.excalidraw.svg)
+
 ## Supported platforms
 
 - Linux/BSD (via MPRIS)
