@@ -142,6 +142,9 @@ unsafe fn set_playback_metadata(metadata: MediaMetadata) {
 
 unsafe fn load_and_set_playback_artwork(url: String, for_counter: usize) {
     let (image, size) = load_image_from_url(&url);
+    if image == nil {
+        return;
+    }
     let artwork = mp_artwork(image, size);
     if GLOBAL_METADATA_COUNTER.load(Ordering::SeqCst) == for_counter {
         set_playback_artwork(artwork);
@@ -321,6 +324,9 @@ unsafe fn load_image_from_url(url: &str) -> (id, CGSize) {
     let url = ns_url(url);
     let image: id = msg_send!(class!(NSImage), alloc);
     let image: id = msg_send!(image, initWithContentsOfURL: url);
+    if image == nil {
+        return (nil, CGSize::new(0.0, 0.0));
+    }
     let size: CGSize = msg_send!(image, size);
     (image, CGSize::new(size.width, size.height))
 }
