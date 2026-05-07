@@ -9,19 +9,13 @@ documentation = "https://docs.rs/souvlaki"
 license = "MIT"
 
 [target.'cfg(target_os = "windows")'.dependencies.windows]
-version = "0.44"
-features = [
-	"Foundation",
-	"Media",
-	"Win32_Foundation",
-	"Win32_System_WinRT",
-	"Storage_Streams",
-]
+version = "0.62"
+features = ["Foundation", "Media", "Win32_Foundation", "Win32_System_WinRT", "Storage_Streams"]
 
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
 block = "0.1.6"
-cocoa = "0.24.0"
-core-graphics = "0.22.2"
+cocoa = "0.26.1"
+core-graphics = "0.25.0"
 dispatch = "0.2.0"
 objc = "0.2.7"
 base64 = "0.22.1"
@@ -29,28 +23,24 @@ base64 = "0.22.1"
 [target.'cfg(all(unix, not(any(target_os = "macos", target_os = "ios", target_os = "android"))))'.dependencies]
 dbus = { version = "0.9.5", optional = true }
 dbus-crossroads = { version = "0.5.0", optional = true }
-zbus = { version = "3.9", optional = true }
-zvariant = { version = "3.10", optional = true }
-pollster = { version = "0.3", optional = true }
-thiserror = "1.0"
+zbus = { version = "5.15", optional = true }
+zbus_macros = { version = "5.15", optional = true }
+zvariant = { version = "5.11", optional = true }
+pollster = { version = "0.4", optional = true }
+thiserror = "2.0"
 
 [features]
 default = ["use_dbus"]
 use_dbus = ["dbus", "dbus-crossroads"]
-use_zbus = ["zbus", "zvariant", "pollster"]
+use_zbus = ["zbus", "zbus_macros", "zvariant", "pollster"]
 
 [dev-dependencies]
-winit = "0.27.0"
-raw-window-handle = "0.5.0"
+winit = "0.30.13"
+raw-window-handle = "0.6.2"
 
 [target.'cfg(target_os = "windows")'.dev-dependencies.windows]
-version = "0.44"
-features = [
-	"Win32_Foundation",
-	"Win32_Graphics_Gdi",
-	"Win32_System_LibraryLoader",
-	"Win32_UI_WindowsAndMessaging"
-]
+version = "0.62"
+features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_System_LibraryLoader", "Win32_UI_WindowsAndMessaging"]
 
 [package.metadata.docs.rs]
 default-target = "x86_64-unknown-linux-gnu"
