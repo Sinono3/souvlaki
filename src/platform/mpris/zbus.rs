@@ -6,7 +6,9 @@ use std::sync::{Arc, Mutex, mpsc};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-use zbus::{ConnectionBuilder, SignalContext, dbus_interface};
+use zbus::connection;
+use zbus::interface;
+use zbus::object_server::SignalEmitter;
 use zvariant::{ObjectPath, Value};
 
 use crate::{
@@ -146,7 +148,7 @@ struct AppInterface {
     event_handler: Arc<Mutex<dyn Fn(MediaControlEvent) + Send + 'static>>,
 }
 
-#[dbus_interface(name = "org.mpris.MediaPlayer2")]
+#[interface(name = "org.mpris.MediaPlayer2")]
 impl AppInterface {
     fn raise(&self) {
         self.send_event(MediaControlEvent::Raise);
@@ -155,32 +157,32 @@ impl AppInterface {
         self.send_event(MediaControlEvent::Quit);
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn can_quit(&self) -> bool {
         true
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn can_raise(&self) -> bool {
         true
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn has_tracklist(&self) -> bool {
         false
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn identity(&self) -> &str {
         &self.friendly_name
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn supported_uri_schemes(&self) -> &[&str] {
         &[]
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn supported_mime_types(&self) -> &[&str] {
         &[]
     }
@@ -203,7 +205,7 @@ impl PlayerInterface {
     }
 }
 
-#[dbus_interface(name = "org.mpris.MediaPlayer2.Player")]
+#[interface(name = "org.mpris.MediaPlayer2.Player")]
 impl PlayerInterface {
     fn next(&self) {
         self.send_event(MediaControlEvent::Next);
@@ -259,7 +261,7 @@ impl PlayerInterface {
         self.send_event(MediaControlEvent::OpenUri(uri));
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn playback_status(&self) -> &'static str {
         match self.state.playback_status {
             MediaPlayback::Playing { .. } => "Playing",
@@ -268,13 +270,13 @@ impl PlayerInterface {
         }
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn rate(&self) -> f64 {
         1.0
     }
 
-    #[dbus_interface(property)]
-    fn metadata(&self) -> HashMap<&str, Value> {
+    #[zbus(property)]
+    fn metadata(&self) -> HashMap<&str, Value<'_>> {
         // TODO: this should be stored in a cache inside the state.
         let mut dict = HashMap::<&str, Value>::new();
 
@@ -314,17 +316,17 @@ impl PlayerInterface {
         dict
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn volume(&self) -> f64 {
         self.state.volume
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn set_volume(&self, volume: f64) {
         self.send_event(MediaControlEvent::SetVolume(volume));
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn position(&self) -> i64 {
         let position = match self.state.playback_status {
             MediaPlayback::Playing {
@@ -339,42 +341,42 @@ impl PlayerInterface {
         position.try_into().unwrap_or(0)
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn minimum_rate(&self) -> f64 {
         1.0
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn maximum_rate(&self) -> f64 {
         1.0
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn can_go_next(&self) -> bool {
         true
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn can_go_previous(&self) -> bool {
         true
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn can_play(&self) -> bool {
         true
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn can_pause(&self) -> bool {
         true
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn can_seek(&self) -> bool {
         true
     }
 
-    #[dbus_interface(property)]
+    #[zbus(property)]
     fn can_control(&self) -> bool {
         true
     }
@@ -402,7 +404,7 @@ async fn run_service(
 
     let name = format!("org.mpris.MediaPlayer2.{dbus_name}");
     let path = ObjectPath::try_from("/org/mpris/MediaPlayer2")?;
-    let connection = ConnectionBuilder::session()?
+    let connection = connection::Builder::session()?
         .serve_at(&path, app)?
         .serve_at(&path, player)?
         .name(name.as_str())?
@@ -420,7 +422,7 @@ async fn run_service(
                 .interface::<_, PlayerInterface>(&path)
                 .await?;
             let mut interface = interface_ref.get_mut().await;
-            let ctxt = SignalContext::new(&connection, &path)?;
+            let ctxt = SignalEmitter::new(&connection, &path)?;
 
             match event {
                 InternalEvent::ChangeMetadata(metadata) => {
