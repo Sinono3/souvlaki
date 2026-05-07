@@ -2,12 +2,12 @@
 
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use windows::core::{Error as WindowsError, HSTRING};
 use windows::Foundation::{EventRegistrationToken, TimeSpan, TypedEventHandler, Uri};
 use windows::Media::*;
 use windows::Storage::Streams::RandomAccessStreamReference;
 use windows::Win32::Foundation::HWND;
 use windows::Win32::System::WinRT::ISystemMediaTransportControlsInterop;
+use windows::core::{Error as WindowsError, HSTRING};
 
 use crate::{
     MediaControlEvent, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig, SeekDirection,

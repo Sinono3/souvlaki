@@ -1,13 +1,13 @@
+use dbus::Path;
 use dbus::arg::{RefArg, Variant};
 use dbus::blocking::Connection;
 use dbus::channel::{MatchingReceiver, Sender};
 use dbus::ffidisp::stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged;
 use dbus::message::SignalArgs;
-use dbus::Path;
 use std::collections::HashMap;
 use std::convert::From;
 use std::convert::TryInto;
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::{Arc, Mutex, mpsc};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 

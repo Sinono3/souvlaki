@@ -6,15 +6,15 @@ use std::fs;
 
 use std::{
     sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     },
     time::Duration,
 };
 
 use block::ConcreteBlock;
 use cocoa::{
-    base::{id, nil, NO, YES},
+    base::{NO, YES, id, nil},
     foundation::{NSInteger, NSString, NSUInteger},
 };
 use core_graphics::geometry::CGSize;

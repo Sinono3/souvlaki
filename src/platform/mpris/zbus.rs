@@ -2,11 +2,11 @@ use std::collections::HashMap;
 use std::convert::From;
 use std::convert::TryFrom;
 use std::convert::TryInto;
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::{Arc, Mutex, mpsc};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-use zbus::{dbus_interface, ConnectionBuilder, SignalContext};
+use zbus::{ConnectionBuilder, SignalContext, dbus_interface};
 use zvariant::{ObjectPath, Value};
 
 use crate::{
