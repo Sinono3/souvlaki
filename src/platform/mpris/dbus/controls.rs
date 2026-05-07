@@ -63,11 +63,11 @@ pub fn create_metadata_dict(metadata: &OwnedMetadata) -> HashMap<String, Variant
     let mut insert = |k: &str, v| dict.insert(k.to_string(), Variant(v));
 
     let OwnedMetadata {
-        ref title,
-        ref album,
-        ref artist,
-        ref cover_url,
-        ref duration,
+        title,
+        album,
+        artist,
+        cover_url,
+        duration,
     } = metadata;
 
     // TODO: this is just a workaround to enable SetPosition.
