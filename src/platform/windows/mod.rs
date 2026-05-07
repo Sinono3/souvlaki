@@ -2,7 +2,7 @@
 
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use windows::Foundation::{EventRegistrationToken, TimeSpan, TypedEventHandler, Uri};
+use windows::Foundation::{TimeSpan, TypedEventHandler, Uri};
 use windows::Media::*;
 use windows::Storage::Streams::RandomAccessStreamReference;
 use windows::Win32::Foundation::HWND;
@@ -16,7 +16,7 @@ use crate::{
 /// A handle to OS media controls.
 pub struct MediaControls {
     controls: SystemMediaTransportControls,
-    button_handler_token: Option<EventRegistrationToken>,
+    button_handler_token: Option<i64>,
     display_updater: SystemMediaTransportControlsDisplayUpdater,
     timeline_properties: SystemMediaTransportControlsTimelineProperties,
 }
@@ -58,8 +58,7 @@ impl MediaControls {
             .hwnd
             .expect("Windows media controls require an HWND in MediaControlsOptions.");
 
-        let controls: SystemMediaTransportControls =
-            unsafe { interop.GetForWindow(HWND(hwnd as isize)) }?;
+        let controls: SystemMediaTransportControls = unsafe { interop.GetForWindow(HWND(hwnd)) }?;
         let display_updater = controls.DisplayUpdater()?;
         let timeline_properties = SystemMediaTransportControlsTimelineProperties::new()?;
 
@@ -93,9 +92,12 @@ impl MediaControls {
         let button_handler = TypedEventHandler::new({
             let event_handler = event_handler.clone();
 
-            move |_, args: &Option<_>| {
-                let args: &SystemMediaTransportControlsButtonPressedEventArgs =
-                    args.as_ref().unwrap();
+            move |_,
+                  args: windows::core::Ref<
+                '_,
+                SystemMediaTransportControlsButtonPressedEventArgs,
+            >| {
+                let args = args.ok()?;
                 let button = args.Button()?;
 
                 let event = if button == SystemMediaTransportControlsButton::Play {
@@ -124,8 +126,8 @@ impl MediaControls {
         self.button_handler_token = Some(self.controls.ButtonPressed(&button_handler)?);
 
         let position_handler = TypedEventHandler::new({
-            move |_, args: &Option<_>| {
-                let args: &PlaybackPositionChangeRequestedEventArgs = args.as_ref().unwrap();
+            move |_, args: windows::core::Ref<'_, PlaybackPositionChangeRequestedEventArgs>| {
+                let args = args.ok()?;
                 let position = Duration::from(args.RequestedPlaybackPosition()?);
 
                 (event_handler.lock().unwrap())(MediaControlEvent::SetPosition(MediaPosition(
@@ -194,7 +196,7 @@ impl MediaControls {
                 let path = url.trim_start_matches("file://");
                 let loader =
                     windows::Storage::StorageFile::GetFileFromPathAsync(&HSTRING::from(path))?;
-                let results = loader.get()?;
+                let results = loader.join()?;
                 loader.Close()?;
 
                 RandomAccessStreamReference::CreateFromFile(&results)?
