@@ -81,7 +81,7 @@ const MPNowPlayingPlaybackStateStopped: NSUInteger = 3;
 // MPRemoteCommandHandlerStatus
 const MPRemoteCommandHandlerStatusSuccess: NSInteger = 0;
 
-extern "C" {
+unsafe extern "C" {
     static MPMediaItemPropertyTitle: id; // NSString
     static MPMediaItemPropertyArtist: id; // NSString
     static MPMediaItemPropertyAlbumTitle: id; // NSString
