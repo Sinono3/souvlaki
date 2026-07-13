@@ -14,7 +14,6 @@ features = ["Foundation", "Media", "Win32_Foundation", "Win32_System_WinRT", "St
 
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
 block = "0.1.6"
-cocoa = "0.26.1"
 core-graphics = "0.25.0"
 dispatch = "0.2.0"
 objc = "0.2.7"
