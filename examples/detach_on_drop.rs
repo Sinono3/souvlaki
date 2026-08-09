@@ -1,19 +1,12 @@
-use souvlaki::{MediaControls, PlatformConfig};
-use std::thread::sleep;
-use std::time::Duration;
 
+#[cfg(not(target_os = "windows"))]
 fn main() {
+    use souvlaki::{MediaControls, PlatformConfig};
+    use std::thread::sleep;
+    use std::time::Duration;
+
     {
-        #[cfg(not(target_os = "windows"))]
         let hwnd = None;
-
-        #[cfg(target_os = "windows")]
-        let hwnd = {
-            use raw_window_handle::Win32WindowHandle;
-
-            let handle: Win32WindowHandle = unimplemented!();
-            Some(handle.hwnd)
-        };
 
         let config = PlatformConfig {
             dbus_name: "my_player",
@@ -33,4 +26,10 @@ fn main() {
     }
     println!("Dropped and detached");
     sleep(Duration::from_secs(2));
+}
+
+#[cfg(target_os = "windows")]
+fn main() {
+    println!("This example is not implemented for Windows");
+    unimplemented!()
 }

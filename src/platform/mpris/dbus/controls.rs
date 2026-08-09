@@ -1,13 +1,13 @@
+use dbus::Path;
 use dbus::arg::{RefArg, Variant};
 use dbus::blocking::Connection;
 use dbus::channel::{MatchingReceiver, Sender};
 use dbus::ffidisp::stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged;
 use dbus::message::SignalArgs;
-use dbus::Path;
 use std::collections::HashMap;
 use std::convert::From;
 use std::convert::TryInto;
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::{Arc, Mutex, mpsc};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
@@ -63,11 +63,11 @@ pub fn create_metadata_dict(metadata: &OwnedMetadata) -> HashMap<String, Variant
     let mut insert = |k: &str, v| dict.insert(k.to_string(), Variant(v));
 
     let OwnedMetadata {
-        ref title,
-        ref album,
-        ref artist,
-        ref cover_url,
-        ref duration,
+        title,
+        album,
+        artist,
+        cover_url,
+        duration,
     } = metadata;
 
     // TODO: this is just a workaround to enable SetPosition.

@@ -1,4 +1,4 @@
-use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, PlatformConfig};
+use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, PlatformConfig};
 
 fn main() {
     #[cfg(not(target_os = "windows"))]
@@ -25,6 +25,9 @@ fn main() {
         .unwrap();
 
     // Update the media metadata.
+    controls
+            .set_playback(MediaPlayback::Playing { progress: None })
+            .unwrap();
     controls
         .set_metadata(MediaMetadata {
             title: Some("Souvlaki Space Station"),
@@ -53,15 +56,14 @@ mod windows {
     use std::io::Error;
     use std::mem;
 
-    use windows::core::PCWSTR;
-    use windows::w;
     use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
     use windows::Win32::System::LibraryLoader::GetModuleHandleW;
     use windows::Win32::UI::WindowsAndMessaging::{
-        CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetAncestor,
-        IsDialogMessageW, PeekMessageW, RegisterClassExW, TranslateMessage, GA_ROOT, MSG,
-        PM_REMOVE, WINDOW_EX_STYLE, WINDOW_STYLE, WM_QUIT, WNDCLASSEXW,
+        CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GA_ROOT, GetAncestor,
+        IsDialogMessageW, MSG, PM_REMOVE, PeekMessageW, RegisterClassExW, TranslateMessage,
+        WINDOW_EX_STYLE, WINDOW_STYLE, WM_QUIT, WNDCLASSEXW,
     };
+    use windows::core::w;
 
     pub struct DummyWindow {
         pub handle: HWND,
@@ -73,12 +75,12 @@ mod windows {
 
             let handle_result = unsafe {
                 let instance = GetModuleHandleW(None)
-                    .map_err(|e| (format!("Getting module handle failed: {e}")))?;
+                    .map_err(|e| format!("Getting module handle failed: {e}"))?;
 
                 let wnd_class = WNDCLASSEXW {
                     cbSize: mem::size_of::<WNDCLASSEXW>() as u32,
-                    hInstance: instance,
-                    lpszClassName: PCWSTR::from(class_name),
+                    hInstance: instance.into(),
+                    lpszClassName: class_name,
                     lpfnWndProc: Some(Self::wnd_proc),
                     ..Default::default()
                 };
@@ -90,7 +92,7 @@ mod windows {
                     ));
                 }
 
-                let handle = CreateWindowExW(
+                CreateWindowExW(
                     WINDOW_EX_STYLE::default(),
                     class_name,
                     w!(""),
@@ -101,18 +103,10 @@ mod windows {
                     0,
                     None,
                     None,
-                    instance,
+                    Some(instance.into()),
                     None,
-                );
-
-                if handle.0 == 0 {
-                    Err(format!(
-                        "Message only window creation failed: {}",
-                        Error::last_os_error()
-                    ))
-                } else {
-                    Ok(handle)
-                }
+                )
+                .map_err(|e| format!("Message only window creation failed: {e}"))
             };
 
             handle_result.map(|handle| DummyWindow { handle })
@@ -130,7 +124,7 @@ mod windows {
     impl Drop for DummyWindow {
         fn drop(&mut self) {
             unsafe {
-                DestroyWindow(self.handle);
+                let _ = DestroyWindow(self.handle);
             }
         }
     }
@@ -141,7 +135,7 @@ mod windows {
             let mut has_message = PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE).as_bool();
             while msg.message != WM_QUIT && has_message {
                 if !IsDialogMessageW(GetAncestor(msg.hwnd, GA_ROOT), &msg).as_bool() {
-                    TranslateMessage(&msg);
+                    let _ = TranslateMessage(&msg);
                     DispatchMessageW(&msg);
                 }
 
