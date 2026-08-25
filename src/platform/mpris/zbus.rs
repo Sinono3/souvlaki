@@ -322,7 +322,8 @@ impl PlayerInterface {
     }
 
     #[zbus(property)]
-    fn set_volume(&self, volume: f64) {
+    fn set_volume(&mut self, volume: f64) {
+        self.state.volume = volume;
         self.send_event(MediaControlEvent::SetVolume(volume));
     }
 
