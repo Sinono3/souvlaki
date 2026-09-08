@@ -68,6 +68,7 @@ pub fn create_metadata_dict(metadata: &OwnedMetadata) -> HashMap<String, Variant
         artist,
         cover_url,
         duration,
+        media_url,
     } = metadata;
 
     // TODO: this is just a workaround to enable SetPosition.
@@ -93,6 +94,9 @@ pub fn create_metadata_dict(metadata: &OwnedMetadata) -> HashMap<String, Variant
     if let Some(album) = album {
         insert("xesam:album", Box::new(album.clone()));
     }
+    if let Some(url) = media_url {
+        insert("xesam:url", Box::new(url.clone()));
+    }
 
     dict
 }
@@ -104,6 +108,7 @@ pub struct OwnedMetadata {
     pub artist: Option<String>,
     pub cover_url: Option<String>,
     pub duration: Option<i64>,
+    pub media_url: Option<String>,
 }
 
 impl From<MediaMetadata<'_>> for OwnedMetadata {
@@ -115,6 +120,7 @@ impl From<MediaMetadata<'_>> for OwnedMetadata {
             cover_url: other.cover_url.map(|s| s.to_string()),
             // TODO: This should probably not have an unwrap
             duration: other.duration.map(|d| d.as_micros().try_into().unwrap()),
+            media_url: other.media_url.map(|s| s.to_string()),
         }
     }
 }
