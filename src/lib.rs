@@ -56,6 +56,11 @@ pub enum MediaControlEvent {
     /// the user must call [`MediaControls::set_volume`]. Note that
     /// this must be done only with the MPRIS backend.
     SetVolume(f64),
+    /// Turn shuffle on or off (currently emitted on macOS/iOS).
+    ///
+    /// Publish the resulting state with `MediaControls::set_shuffle` on
+    /// macOS/iOS after handling the request.
+    SetShuffle(bool),
     /// Open the URI in the media player.
     OpenUri(String),
 

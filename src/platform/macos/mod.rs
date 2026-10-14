@@ -18,8 +18,9 @@ use core_graphics::geometry::CGSize;
 
 use dispatch::{Queue, QueuePriority};
 use objc::{
-    class, msg_send, sel, sel_impl,
-    runtime::{NO, Object, YES},
+    class, msg_send,
+    runtime::{BOOL, NO, Object, YES},
+    sel, sel_impl,
 };
 
 use crate::{MediaControlEvent, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig};
@@ -73,6 +74,22 @@ impl MediaControls {
         unsafe { set_playback_metadata(metadata) };
         Ok(())
     }
+
+    /// Publish the current shuffle state and enable its remote command.
+    ///
+    /// Available on macOS/iOS. Call after [`Self::attach`]. `None` disables
+    /// the command for a player that does not support shuffle. After a
+    /// [`MediaControlEvent::SetShuffle`] request, publish the state the
+    /// player actually accepted; the callback does not change it itself.
+    pub fn set_shuffle(&mut self, shuffle: Option<bool>) -> Result<(), Error> {
+        unsafe {
+            let command_center: Id = msg_send!(class!(MPRemoteCommandCenter), sharedCommandCenter);
+            let command: Id = msg_send!(command_center, changeShuffleModeCommand);
+            let _: () = msg_send!(command, setCurrentShuffleType: shuffle_type(shuffle));
+            let _: () = msg_send!(command, setEnabled: if shuffle.is_some() { YES } else { NO });
+        }
+        Ok(())
+    }
 }
 
 // MPNowPlayingPlaybackState
@@ -82,6 +99,31 @@ const MPNowPlayingPlaybackStateStopped: usize = 3;
 
 // MPRemoteCommandHandlerStatus
 const MPRemoteCommandHandlerStatusSuccess: isize = 0;
+const MPRemoteCommandHandlerStatusCommandFailed: isize = 200;
+
+// MPShuffleType, as declared by MediaPlayer/MPRemoteControlTypes.h.
+const MPShuffleTypeOff: isize = 0;
+const MPShuffleTypeItems: isize = 1;
+const MPShuffleTypeCollections: isize = 2;
+
+fn shuffle_type(shuffle: Option<bool>) -> isize {
+    if shuffle == Some(true) {
+        MPShuffleTypeItems
+    } else {
+        MPShuffleTypeOff
+    }
+}
+
+fn shuffle_event(enabled: bool, shuffle_type: isize) -> Option<MediaControlEvent> {
+    if !enabled {
+        return None;
+    }
+    match shuffle_type {
+        MPShuffleTypeOff => Some(MediaControlEvent::SetShuffle(false)),
+        MPShuffleTypeItems | MPShuffleTypeCollections => Some(MediaControlEvent::SetShuffle(true)),
+        _ => None,
+    }
+}
 
 unsafe extern "C" {
     static MPMediaItemPropertyTitle: Id; // NSString
@@ -268,6 +310,32 @@ unsafe fn attach_command_handlers(handler: Arc<dyn Fn(MediaControlEvent)>) {
         let cmd: Id = msg_send!(command_center, changePlaybackPositionCommand);
         let _: () = msg_send!(cmd, setEnabled: YES);
         let _: () = msg_send!(cmd, addTargetWithHandler: position_handler);
+
+        // changeShuffleModeCommand. Only players that publish a shuffle
+        // state opt in; receiving a request never publishes unconfirmed state.
+        let shuffle_handler = ConcreteBlock::new({
+            let handler = handler.clone();
+            move |event: Id| -> isize {
+                // MediaRemote setters can still invoke disabled commands.
+                // Keep the opt-in contract even for those callers.
+                let command_center: Id =
+                    msg_send!(class!(MPRemoteCommandCenter), sharedCommandCenter);
+                let command: Id = msg_send!(command_center, changeShuffleModeCommand);
+                let enabled: BOOL = msg_send!(command, isEnabled);
+                let shuffle_type: isize = msg_send!(event, shuffleType);
+                match shuffle_event(enabled == YES, shuffle_type) {
+                    Some(event) => {
+                        (handler)(event);
+                        MPRemoteCommandHandlerStatusSuccess
+                    }
+                    None => MPRemoteCommandHandlerStatusCommandFailed,
+                }
+            }
+        })
+        .copy();
+        let cmd: Id = msg_send!(command_center, changeShuffleModeCommand);
+        let _: () = msg_send!(cmd, setEnabled: NO);
+        let _: () = msg_send!(cmd, addTargetWithHandler: shuffle_handler);
     }
 }
 
@@ -276,6 +344,10 @@ unsafe fn detach_command_handlers() {
         let command_center: Id = msg_send!(class!(MPRemoteCommandCenter), sharedCommandCenter);
 
         let cmd: Id = msg_send!(command_center, togglePlayPauseCommand);
+        let _: () = msg_send!(cmd, setEnabled: NO);
+        let _: () = msg_send!(cmd, removeTarget: std::ptr::null_mut::<Object>());
+
+        let cmd: Id = msg_send!(command_center, changeShuffleModeCommand);
         let _: () = msg_send!(cmd, setEnabled: NO);
         let _: () = msg_send!(cmd, removeTarget: std::ptr::null_mut::<Object>());
 
@@ -377,5 +449,43 @@ unsafe fn mp_artwork(image: Id, bounds: CGSize) -> Id {
         let artwork: Id = msg_send!(artwork, initWithBoundsSize: bounds
                                              requestHandler: handler);
         artwork
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn native_shuffle_requests_preserve_off_and_both_shuffle_types() {
+        assert_eq!(
+            shuffle_event(true, 0),
+            Some(MediaControlEvent::SetShuffle(false))
+        );
+        assert_eq!(
+            shuffle_event(true, 1),
+            Some(MediaControlEvent::SetShuffle(true))
+        );
+        assert_eq!(
+            shuffle_event(true, 2),
+            Some(MediaControlEvent::SetShuffle(true))
+        );
+        assert_eq!(shuffle_event(true, 3), None);
+        assert_eq!(shuffle_event(true, -1), None);
+        assert_eq!(shuffle_event(true, isize::MAX), None);
+    }
+
+    #[test]
+    fn disabled_shuffle_does_not_forward_even_forced_media_remote_requests() {
+        for mode in [-1, 0, 1, 2, 3, isize::MAX] {
+            assert_eq!(shuffle_event(false, mode), None);
+        }
+    }
+
+    #[test]
+    fn published_shuffle_uses_items_and_clears_unsupported_state() {
+        assert_eq!(shuffle_type(Some(true)), 1);
+        assert_eq!(shuffle_type(Some(false)), 0);
+        assert_eq!(shuffle_type(None), 0);
     }
 }

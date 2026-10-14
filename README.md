@@ -78,7 +78,7 @@ souvlaki = { version = "<version>", default-features = false, features = ["use_z
 
 ## Example
 
-```rust
+```rust,no_run
 use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, PlatformConfig};
 
 fn main() {
@@ -126,6 +126,19 @@ fn main() {
 ```
 
 [Check out this example here.](https://github.com/Sinono3/souvlaki/blob/master/examples/print_events.rs)
+
+## Shuffle on macOS/iOS
+
+After attaching a handler, call `controls.set_shuffle(Some(false))` to
+advertise shuffle support and its current state (`Some(true)` when enabled).
+The handler receives `MediaControlEvent::SetShuffle(bool)` when a remote
+control requests a change. Apply it in the player and publish the accepted
+state with `set_shuffle` again. `set_shuffle(None)` disables the command.
+
+The command starts disabled, so existing players do not advertise a control
+they cannot handle. Dropping or detaching the controls removes the handler.
+The setter is currently available only on macOS/iOS. This adds an event enum
+variant: exhaustive matches must handle `SetShuffle`, even on other targets.
 
 ## Thanks 💗
 
