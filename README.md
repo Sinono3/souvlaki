@@ -1,4 +1,12 @@
-
+> [!IMPORTANT]
+> There is an almost complete rewrite of the library available at the [0.9 branch of this repository](https://github.com/Sinono3/souvlaki/tree/0.9),
+> created around Aug 2025. It hasn't been merged yet, and it is _unstable_. I finished writing 90% of the code, but didn't get around to testing it properly.
+> Anyways, for those interested: please try it out!
+> The API should be cleaner, and the internals less prone to bugs.
+> I'm seeing many PRs being opened for features/bugfixes already available that branch.
+> In the next few weeks (October 2026) I will have more time, and I plan to publish a pre-release on crates.io.
+> I should have posted this way back in August, but I didn't.
+> Thank you for your patience and support!
 
 # Souvlaki [![Crates.io](https://img.shields.io/crates/v/souvlaki.svg)](https://crates.io/crates/souvlaki) [![Docs](https://docs.rs/souvlaki/badge.svg)](https://docs.rs/souvlaki) [![CI](https://github.com/Sinono3/souvlaki/actions/workflows/build.yml/badge.svg)](https://github.com/Sinono3/souvlaki/actions/workflows/build.yml)
 
