@@ -31,6 +31,7 @@ pub struct MediaMetadata<'a> {
     /// For MacOS, you can look into [these lines](https://github.com/Sinono3/souvlaki/blob/384539fe83e8bf5c966192ba28e9405e3253619b/src/platform/macos/mod.rs#L131-L137) of the implementation. These lines refer to creating an [MPMediaItemArtwork](https://developer.apple.com/documentation/mediaplayer/mpmediaitemartwork) object.
     pub cover_url: Option<&'a str>,
     pub duration: Option<Duration>,
+    pub media_url: Option<&'a str>,
 }
 
 /// Events sent by the OS media controls.
