@@ -18,8 +18,9 @@ use core_graphics::geometry::CGSize;
 
 use dispatch::{Queue, QueuePriority};
 use objc::{
-    class, msg_send, sel, sel_impl,
+    class, msg_send,
     runtime::{NO, Object, YES},
+    sel, sel_impl,
 };
 
 use crate::{MediaControlEvent, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig};
@@ -120,6 +121,16 @@ unsafe fn set_playback_metadata(metadata: MediaMetadata) {
         let prev_counter = GLOBAL_METADATA_COUNTER.fetch_add(1, Ordering::SeqCst);
         let media_center: Id = msg_send!(class!(MPNowPlayingInfoCenter), defaultCenter);
         let now_playing: Id = msg_send!(class!(NSMutableDictionary), dictionary);
+        if metadata.cover_url.is_some() {
+            let previous: Id = msg_send!(media_center, nowPlayingInfo);
+            if !previous.is_null() {
+                let artwork: Id = msg_send!(previous, objectForKey: MPMediaItemPropertyArtwork);
+                if !artwork.is_null() {
+                    let _: () = msg_send!(now_playing, setObject: artwork
+                                                       forKey: MPMediaItemPropertyArtwork);
+                }
+            }
+        }
         if let Some(title) = metadata.title {
             let _: () = msg_send!(now_playing, setObject: ns_string(title)
                                                   forKey: MPMediaItemPropertyTitle);
@@ -136,23 +147,24 @@ unsafe fn set_playback_metadata(metadata: MediaMetadata) {
             let _: () = msg_send!(now_playing, setObject: ns_number(duration.as_secs_f64())
                                                   forKey: MPMediaItemPropertyPlaybackDuration);
         }
+        let _: () = msg_send!(media_center, setNowPlayingInfo: now_playing);
         if let Some(cover_url) = metadata.cover_url {
             let cover_url = cover_url.to_owned();
             Queue::global(QueuePriority::Default).exec_async(move || unsafe {
                 load_and_set_playback_artwork(cover_url, prev_counter + 1);
             });
         }
-        let _: () = msg_send!(media_center, setNowPlayingInfo: now_playing);
     }
 }
 
 unsafe fn load_and_set_playback_artwork(url: String, for_counter: usize) {
     unsafe {
         let (image, size) = load_image_from_url(&url);
-        if image.is_null() {
-            return;
-        }
-        let artwork = mp_artwork(image, size);
+        let artwork = if image.is_null() {
+            std::ptr::null_mut()
+        } else {
+            mp_artwork(image, size)
+        };
         if GLOBAL_METADATA_COUNTER.load(Ordering::SeqCst) == for_counter {
             set_playback_artwork(artwork);
         }
@@ -165,8 +177,12 @@ unsafe fn set_playback_artwork(artwork: Id) {
         let now_playing: Id = msg_send!(class!(NSMutableDictionary), dictionary);
         let prev_now_playing: Id = msg_send!(media_center, nowPlayingInfo);
         let _: () = msg_send!(now_playing, addEntriesFromDictionary: prev_now_playing);
-        let _: () = msg_send!(now_playing, setObject: artwork
-                                              forKey: MPMediaItemPropertyArtwork);
+        if artwork.is_null() {
+            let _: () = msg_send!(now_playing, removeObjectForKey: MPMediaItemPropertyArtwork);
+        } else {
+            let _: () = msg_send!(now_playing, setObject: artwork
+                                                  forKey: MPMediaItemPropertyArtwork);
+        }
         let _: () = msg_send!(media_center, setNowPlayingInfo: now_playing);
     }
 }
