@@ -86,7 +86,7 @@ souvlaki = { version = "<version>", default-features = false, features = ["use_z
 
 ## Example
 
-```rust
+```rust,no_run
 use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, PlatformConfig};
 
 fn main() {
