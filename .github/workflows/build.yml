@@ -11,12 +11,15 @@ jobs:
       fail-fast: false
       matrix:
         os: [macOS-latest, windows-latest, ubuntu-latest]
+        rust: [stable, "1.87"]
 
     runs-on: ${{ matrix.os }}
 
     steps:
     - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@stable
+    - uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ matrix.rust }}
     - uses: Swatinem/rust-cache@v2
     - name: Install Dependencies
       run: |

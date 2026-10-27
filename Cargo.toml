@@ -3,6 +3,7 @@ name = "souvlaki"
 version = "0.8.3"
 authors = ["Sinono3 <aldoacevedo@protonmail.com>"]
 edition = "2024"
+rust-version = "1.87"
 description = "A cross-platform media key and metadata handling library."
 repository = "https://github.com/Sinono3/souvlaki"
 documentation = "https://docs.rs/souvlaki"
