@@ -16,6 +16,12 @@ Types of changes:
 
 ## [Unreleased]
 
+## [0.9.1]
+
+### Fixed
+
+- Suppress `unexpected_cfgs` warnings caused by `cfg(cargo-clippy)` in `objc` 0.2.x macro expansions
+
 ## [0.9.0]
 
 ### Added
