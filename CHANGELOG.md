@@ -16,6 +16,12 @@ Types of changes:
 
 ## [Unreleased]
 
+## [0.9.2]
+
+### Fixed
+
+- Remove redundant nested `unsafe` blocks in the macOS backend that triggered `unused_unsafe` warnings
+
 ## [0.9.1]
 
 ### Fixed
