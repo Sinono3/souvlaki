@@ -4,7 +4,7 @@
 > Anyways, for those interested: please try it out!
 > The API should be cleaner, and the internals less prone to bugs.
 > I'm seeing many PRs being opened for features/bugfixes already available that branch.
-> In the next few weeks (October 2026) I will have more time, and I plan to publish a pre-release on crates.io.
+> I plan to publish a pre-release on crates.io soon.
 > I should have posted this way back in August, but I didn't.
 > Thank you for your patience and support!
 
@@ -23,14 +23,14 @@ A cross-platform library for handling OS media controls and metadata. One abstra
 ## Windows
 
 - Update metadata:\
-![image](https://user-images.githubusercontent.com/8389938/106080661-4a515e80-60f6-11eb-81e0-81ab0eda5188.png)
+  ![image](https://user-images.githubusercontent.com/8389938/106080661-4a515e80-60f6-11eb-81e0-81ab0eda5188.png)
 - Play and pause polling.\
-![play_pause](https://user-images.githubusercontent.com/8389938/106080917-bdf36b80-60f6-11eb-98b5-f3071ae3eab6.gif)
+  ![play_pause](https://user-images.githubusercontent.com/8389938/106080917-bdf36b80-60f6-11eb-98b5-f3071ae3eab6.gif)
 
 ## Linux
 
 - GNOME: \
-![GNOME](https://user-images.githubusercontent.com/59307989/150836249-3270c4fc-78b9-4b8d-8d50-dd030b72b631.png)
+  ![GNOME](https://user-images.githubusercontent.com/59307989/150836249-3270c4fc-78b9-4b8d-8d50-dd030b72b631.png)
 
 - playerctl:
 ```shell
@@ -51,9 +51,9 @@ my_player xesam:title               When The Sun Hits
 ## MacOS
 
 - Control Center:\
-![Control Center](https://user-images.githubusercontent.com/434125/171526539-ecb07a74-5dc5-4f4b-8305-4a99d4d5c31c.png)
+  ![Control Center](https://user-images.githubusercontent.com/434125/171526539-ecb07a74-5dc5-4f4b-8305-4a99d4d5c31c.png)
 - Now Playing:\
-![Now Playing](https://user-images.githubusercontent.com/434125/171526759-9232be58-63ed-4eea-ac15-aa50258d8254.png)
+  ![Now Playing](https://user-images.githubusercontent.com/434125/171526759-9232be58-63ed-4eea-ac15-aa50258d8254.png)
 
 ## Requirements
 

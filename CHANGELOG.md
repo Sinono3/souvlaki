@@ -16,6 +16,35 @@ Types of changes:
 
 ## [Unreleased]
 
+## [0.9.0]
+
+### Added
+
+- Add opt-in macOS/iOS shuffle commands (#85. Thanks! @barissglc)
+  - New `MediaControlEvent::SetShuffle(bool)` event
+  - New `MediaControls::set_shuffle(Option<bool>)` on macOS/iOS
+- Add CI workflow for auto-releases
+- Add diagram in README
+- Add diagram file
+
+### Changed
+
+- **Breaking:** Crate and Edition Updates (#78. Thanks! @101100)
+  - Rust edition bumped to 2024.
+  - MSRV bumped to 1.87
+  - Dependency updates
+  - CI will now run on stable and 1.87
+- **Breaking:** `MediaControlEvent` is now `#[non_exhaustive]`. Matches on it need a wildcard (`_ =>`) arm
+- Update README.md
+
+### Fixed
+
+- Add nil check for NSImage in macOS load_image_from_url (#76. Thanks! @teancom)
+- Fix macOS build: stale Cocoa nil references from #76 merge (#79. Thanks! @animegolem)
+- fix(zbus): Update `set_volume` in `PlayerInterface` to update internal volume (#81. Thanks! @UnknownSuperficialNight)
+- fix: prevent macOS artwork flicker (#83. Thanks! @Waradu)
+- fix: iOS panic when loading cover art from URL (#86 / #58. Thanks! @will3942)
+
 ## [0.8.3]
 
 ### Added
