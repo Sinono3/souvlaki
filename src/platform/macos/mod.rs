@@ -343,7 +343,11 @@ unsafe fn ns_url(value: &str) -> Id {
 #[cfg(target_os = "ios")]
 unsafe fn load_image_from_url(url: &str) -> (Id, CGSize) {
     unsafe {
-        let image_data = fs::read(&url).unwrap();
+        // iOS can only load artwork from local files, not HTTP.
+        let path = url.strip_prefix("file://").unwrap_or(url);
+        let Ok(image_data) = fs::read(path) else {
+            return (std::ptr::null_mut::<Object>(), CGSize::new(0.0, 0.0));
+        };
         let base64_data = base64::encode(image_data);
         let base64_ns_string = ns_string(&base64_data);
 
