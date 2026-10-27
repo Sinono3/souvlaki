@@ -16,6 +16,12 @@ Types of changes:
 
 ## [Unreleased]
 
+## [0.9.3]
+
+### Fixed
+
+- Bump version to 0.9.3 in Cargo.toml
+
 ## [0.9.2]
 
 ### Fixed
