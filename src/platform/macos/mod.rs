@@ -191,7 +191,7 @@ unsafe fn set_playback_metadata(metadata: MediaMetadata) {
         let _: () = msg_send!(media_center, setNowPlayingInfo: now_playing);
         if let Some(cover_url) = metadata.cover_url {
             let cover_url = cover_url.to_owned();
-            Queue::global(QueuePriority::Default).exec_async(move || unsafe {
+            Queue::global(QueuePriority::Default).exec_async(move || {
                 load_and_set_playback_artwork(cover_url, prev_counter + 1);
             });
         }
@@ -314,7 +314,7 @@ unsafe fn attach_command_handlers(handler: Arc<dyn Fn(MediaControlEvent)>) {
             let handler = handler.clone();
             // event of type MPChangePlaybackPositionCommandEvent
             move |event: Id| -> isize {
-                let position = unsafe { *event.as_ref().unwrap().get_ivar::<f64>("_positionTime") };
+                let position = *event.as_ref().unwrap().get_ivar::<f64>("_positionTime");
                 (handler)(MediaControlEvent::SetPosition(MediaPosition(
                     Duration::from_secs_f64(position),
                 )));
