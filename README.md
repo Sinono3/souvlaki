@@ -1,5 +1,5 @@
 > [!IMPORTANT]
-> There is an almost complete rewrite of the library available at the [0.9 branch of this repository](https://github.com/Sinono3/souvlaki/tree/0.9),
+> There is an almost complete rewrite of the library available at the [1.0 branch of this repository](https://github.com/Sinono3/souvlaki/tree/1.0),
 > created around Aug 2025. It hasn't been merged yet, and it is _unstable_. I finished writing 90% of the code, but didn't get around to testing it properly.
 > Anyways, for those interested: please try it out!
 > The API should be cleaner, and the internals less prone to bugs.
