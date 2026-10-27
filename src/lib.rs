@@ -35,6 +35,7 @@ pub struct MediaMetadata<'a> {
 
 /// Events sent by the OS media controls.
 #[derive(Clone, PartialEq, Debug)]
+#[non_exhaustive]
 pub enum MediaControlEvent {
     Play,
     Pause,
