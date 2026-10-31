@@ -16,6 +16,12 @@ Types of changes:
 
 ## [Unreleased]
 
+### Added
+
+- Opt-in macOS/iOS like commands with `MediaControls::set_like` and
+  `MediaControlEvent::SetLike`, including explicit unlike requests and
+  publication of the accepted native feedback state.
+
 ## [0.9.3]
 
 ### Fixed
