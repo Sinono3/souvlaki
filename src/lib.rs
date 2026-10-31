@@ -64,6 +64,13 @@ pub enum MediaControlEvent {
     ///
     /// **NOTE**: currently only emitted on macOS/iOS
     SetShuffle(bool),
+    /// Add or remove the current media item's like.
+    ///
+    /// A `false` value removes a like; it is not a dislike request.
+    /// Publish the accepted state with `MediaControls::set_like`.
+    ///
+    /// **NOTE**: currently only emitted on macOS/iOS.
+    SetLike(bool),
     /// Open the URI in the media player.
     OpenUri(String),
 

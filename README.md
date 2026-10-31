@@ -135,6 +135,22 @@ fn main() {
 
 [Check out this example here.](https://github.com/Sinono3/souvlaki/blob/master/examples/print_events.rs)
 
+## Likes on macOS and iOS
+
+After attaching a handler, call `controls.set_like(Some(false))` to enable
+the native like command for an unliked item, or `Some(true)` for a liked item.
+`None` disables support and clears the native active state. Support starts
+disabled, so existing players do not advertise a command they cannot handle.
+
+Handle `MediaControlEvent::SetLike(true)` by adding a like and `SetLike(false)`
+by removing it. Removing a like is not a dislike. These requests set an
+explicit value rather than toggling it, so repeated requests are idempotent.
+Publish the resulting state with `set_like` after the player accepts it,
+including when the track changes or the state changes inside the player.
+The callback itself does not change the published state. Detaching disables
+the command and clears its active state. Other platforms do not emit this
+event and do not expose `set_like`.
+
 ## Thanks 💗
 
 - To [jpochyla](https://github.com/jpochyla) for being a contributor to library architecture and the sole developer of MacOS support.

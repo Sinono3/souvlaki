@@ -90,6 +90,22 @@ impl MediaControls {
         }
         Ok(())
     }
+
+    /// Publish whether the current media item is liked and enable its command.
+    ///
+    /// Available on macOS/iOS. Call after [`Self::attach`]. `None` disables
+    /// the command and clears its active state. After a
+    /// [`MediaControlEvent::SetLike`] request, publish the state the player
+    /// accepted. Receiving a request does not update the published state.
+    pub fn set_like(&mut self, liked: Option<bool>) -> Result<(), Error> {
+        unsafe {
+            let command_center: Id = msg_send!(class!(MPRemoteCommandCenter), sharedCommandCenter);
+            let command: Id = msg_send!(command_center, likeCommand);
+            let _: () = msg_send!(command, setActive: if liked == Some(true) { YES } else { NO });
+            let _: () = msg_send!(command, setEnabled: if liked.is_some() { YES } else { NO });
+        }
+        Ok(())
+    }
 }
 
 // MPNowPlayingPlaybackState
@@ -123,6 +139,10 @@ fn shuffle_event(enabled: bool, shuffle_type: isize) -> Option<MediaControlEvent
         MPShuffleTypeItems | MPShuffleTypeCollections => Some(MediaControlEvent::SetShuffle(true)),
         _ => None,
     }
+}
+
+fn like_event(enabled: bool, negative: bool) -> Option<MediaControlEvent> {
+    enabled.then_some(MediaControlEvent::SetLike(!negative))
 }
 
 unsafe extern "C" {
@@ -351,6 +371,31 @@ unsafe fn attach_command_handlers(handler: Arc<dyn Fn(MediaControlEvent)>) {
         let cmd: Id = msg_send!(command_center, changeShuffleModeCommand);
         let _: () = msg_send!(cmd, setEnabled: NO);
         let _: () = msg_send!(cmd, addTargetWithHandler: shuffle_handler);
+
+        // likeCommand. MPFeedbackCommandEvent's negative operation removes
+        // an existing like; it must not be interpreted as a dislike or toggle.
+        let like_handler = ConcreteBlock::new({
+            let handler = handler.clone();
+            move |event: Id| -> isize {
+                let command_center: Id =
+                    msg_send!(class!(MPRemoteCommandCenter), sharedCommandCenter);
+                let command: Id = msg_send!(command_center, likeCommand);
+                let enabled: BOOL = msg_send!(command, isEnabled);
+                let negative: BOOL = msg_send!(event, isNegative);
+                match like_event(enabled == YES, negative == YES) {
+                    Some(event) => {
+                        (handler)(event);
+                        MPRemoteCommandHandlerStatusSuccess
+                    }
+                    None => MPRemoteCommandHandlerStatusCommandFailed,
+                }
+            }
+        })
+        .copy();
+        let cmd: Id = msg_send!(command_center, likeCommand);
+        let _: () = msg_send!(cmd, setEnabled: NO);
+        let _: () = msg_send!(cmd, setActive: NO);
+        let _: () = msg_send!(cmd, addTargetWithHandler: like_handler);
     }
 }
 
@@ -364,6 +409,11 @@ unsafe fn detach_command_handlers() {
 
         let cmd: Id = msg_send!(command_center, changeShuffleModeCommand);
         let _: () = msg_send!(cmd, setEnabled: NO);
+        let _: () = msg_send!(cmd, removeTarget: std::ptr::null_mut::<Object>());
+
+        let cmd: Id = msg_send!(command_center, likeCommand);
+        let _: () = msg_send!(cmd, setEnabled: NO);
+        let _: () = msg_send!(cmd, setActive: NO);
         let _: () = msg_send!(cmd, removeTarget: std::ptr::null_mut::<Object>());
 
         let cmd: Id = msg_send!(command_center, playCommand);
@@ -474,6 +524,28 @@ unsafe fn mp_artwork(image: Id, bounds: CGSize) -> Id {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn feedback_requests_set_and_remove_likes_without_toggling() {
+        assert_eq!(
+            like_event(true, false),
+            Some(MediaControlEvent::SetLike(true))
+        );
+        assert_eq!(
+            like_event(true, false),
+            Some(MediaControlEvent::SetLike(true))
+        );
+        assert_eq!(
+            like_event(true, true),
+            Some(MediaControlEvent::SetLike(false))
+        );
+    }
+
+    #[test]
+    fn disabled_like_does_not_forward_positive_or_negative_requests() {
+        assert_eq!(like_event(false, false), None);
+        assert_eq!(like_event(false, true), None);
+    }
 
     #[test]
     fn native_shuffle_requests_preserve_off_and_both_shuffle_types() {
