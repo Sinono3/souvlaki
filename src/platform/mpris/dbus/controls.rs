@@ -228,17 +228,24 @@ where
         }),
     );
 
+    // Answer method calls as they come and send all the changes waiting in one signal.
+    // Waiting up to a second in `process` after each change made a song change, which is
+    // several changes, reach the desktop seconds late.
     loop {
-        if let Ok(event) = event_channel.recv_timeout(Duration::from_millis(10)) {
-            if event == InternalEvent::Kill {
-                break;
-            }
+        while conn.process(Duration::ZERO)? {}
+        let first = match event_channel.recv_timeout(Duration::from_millis(20)) {
+            Ok(event) => event,
+            Err(mpsc::RecvTimeoutError::Timeout) => continue,
+            Err(mpsc::RecvTimeoutError::Disconnected) => break,
+        };
 
-            let mut changed_properties = HashMap::new();
+        let mut changed_properties = HashMap::new();
 
+        for event in std::iter::once(first).chain(event_channel.try_iter()) {
+            let mut state = state.lock().unwrap();
             match event {
+                InternalEvent::Kill => return Ok(()),
                 InternalEvent::ChangeMetadata(metadata) => {
-                    let mut state = state.lock().unwrap();
                     state.set_metadata(metadata);
                     changed_properties.insert(
                         "Metadata".to_owned(),
@@ -246,7 +253,6 @@ where
                     );
                 }
                 InternalEvent::ChangePlayback(playback) => {
-                    let mut state = state.lock().unwrap();
                     state.playback_status = playback;
                     changed_properties.insert(
                         "PlaybackStatus".to_owned(),
@@ -254,25 +260,22 @@ where
                     );
                 }
                 InternalEvent::ChangeVolume(volume) => {
-                    let mut state = state.lock().unwrap();
                     state.volume = volume;
                     changed_properties.insert("Volume".to_owned(), Variant(Box::new(volume)));
                 }
-                _ => (),
             }
-
-            let properties_changed = PropertiesPropertiesChanged {
-                interface_name: "org.mpris.MediaPlayer2.Player".to_owned(),
-                changed_properties,
-                invalidated_properties: Vec::new(),
-            };
-
-            conn.send(
-                properties_changed.to_emit_message(&Path::new("/org/mpris/MediaPlayer2").unwrap()),
-            )
-            .ok();
         }
-        conn.process(Duration::from_millis(1000))?;
+
+        let properties_changed = PropertiesPropertiesChanged {
+            interface_name: "org.mpris.MediaPlayer2.Player".to_owned(),
+            changed_properties,
+            invalidated_properties: Vec::new(),
+        };
+
+        conn.send(
+            properties_changed.to_emit_message(&Path::new("/org/mpris/MediaPlayer2").unwrap()),
+        )
+        .ok();
     }
 
     Ok(())
