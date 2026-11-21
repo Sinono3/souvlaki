@@ -16,6 +16,11 @@ Types of changes:
 
 ## [Unreleased]
 
+### Fixed
+
+- MPRIS (dbus): changes reach the desktop as they happen instead of up to a second late each,
+  and the changes waiting go out in one `PropertiesChanged` signal.
+
 ## [0.9.3]
 
 ### Fixed
