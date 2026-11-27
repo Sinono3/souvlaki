@@ -229,9 +229,12 @@ where
     );
 
     loop {
-        if let Ok(event) = event_channel.recv_timeout(Duration::from_millis(10)) {
+        // Handle every event that is already queued before serving the bus again: one event
+        // per round let updates sent more often than once a round pile up in the channel.
+        let mut next_event = event_channel.recv_timeout(Duration::from_millis(10)).ok();
+        while let Some(event) = next_event.take() {
             if event == InternalEvent::Kill {
-                break;
+                return Ok(());
             }
 
             let mut changed_properties = HashMap::new();
@@ -271,9 +274,11 @@ where
                 properties_changed.to_emit_message(&Path::new("/org/mpris/MediaPlayer2").unwrap()),
             )
             .ok();
-        }
-        conn.process(Duration::from_millis(1000))?;
-    }
 
-    Ok(())
+            next_event = event_channel.try_recv().ok();
+        }
+        // Wait only briefly for incoming calls: while this blocks, new events wait in the
+        // channel, so a long timeout delayed every update by up to that long.
+        conn.process(Duration::from_millis(10))?;
+    }
 }
