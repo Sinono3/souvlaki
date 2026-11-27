@@ -16,6 +16,10 @@ Types of changes:
 
 ## [Unreleased]
 
+### Fixed
+
+- MPRIS (`use_dbus`): handle every queued update at once and wait at most 10 ms for D-Bus calls instead of 1 s, so updates no longer lag behind by up to a second each and pile up when sent more than once a second (#75)
+
 ## [0.9.3]
 
 ### Fixed
